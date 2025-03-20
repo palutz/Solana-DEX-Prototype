@@ -1,8 +1,7 @@
-debug/
-target/
 .anchor
 .DS_Store
-**/*.rs.bk
+target
 node_modules
+dist
+build
 test-ledger
-.yarn
