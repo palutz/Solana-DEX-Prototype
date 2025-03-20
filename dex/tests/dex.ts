@@ -6,7 +6,7 @@ describe("dex", () => {
   // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.env());
 
-  const program = anchor.workspace.Dex as Program<Dex>;
+  const program = anchor.workspace.dex as Program<Dex>;
 
   it("Is initialized!", async () => {
     // Add your test here.
