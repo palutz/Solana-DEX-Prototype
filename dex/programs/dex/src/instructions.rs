@@ -1,11 +1,26 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{
-    associated_token::AssociatedToken,
-    token_interface::{Mint, TokenAccount, TokenInterface},
-};
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
-pub fn _initialize(ctx: Context<Initialize>) -> Result<()> {
-    todo!();
+use crate::DexError;
+
+pub fn _initialize(
+    ctx: Context<Initialize>,
+    fee_numerator: u64,
+    fee_denominator: u64,
+) -> Result<()> {
+    // Check that fee values are valid (non-zero numerator and numerator < denominator)
+    require!(
+        fee_numerator != 0 && fee_numerator < fee_denominator,
+        DexError::InvalidFees
+    );
+
+    // Initialize the dex state
+    let dex_state = &mut ctx.accounts.dex_state;
+    dex_state.admin = *ctx.accounts.admin.key;
+    dex_state.pools_count = 0;
+    dex_state.fee_numerator = fee_numerator;
+    dex_state.fee_denominator = fee_denominator;
+
     Ok(())
 }
 
@@ -31,18 +46,23 @@ pub fn _swap(ctx: Context<Swap>) -> Result<()> {
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
-    #[account(mut)]
-    pub admin: Signer<'info>,
-
     #[account(
-        init,
+        mut,
+        // Check that the signer is the admin.
+        constraint = admin.key() == crate::ADMIN_PUBKEY @ DexError::NotAdmin
+    )]
+    pub admin: Signer<'info>,
+    #[account(
+        init_if_needed,
         payer = admin,
         space = 8 + DexState::LEN,
-        seeds = [b"dex_state"],
+        seeds = [
+            b"dex_state",
+            admin.key().as_ref(),
+        ],
         bump
     )]
     pub dex_state: Account<'info, DexState>,
-
     pub system_program: Program<'info, System>,
 }
 
@@ -100,7 +120,10 @@ pub struct CreatePool<'info> {
 #[account]
 pub struct DexState {
     pub admin: Pubkey,
+    /// Incremented each time a new trading pair is created
     pub pools_count: u64,
+    /// Using two integers to represent a fraction allows for exact calculations using only integer
+    /// math, which is more deterministic.
     pub fee_numerator: u64,
     pub fee_denominator: u64,
 }
@@ -224,7 +247,7 @@ pub struct WithdrawLiquidity<'info> {
 #[derive(Accounts)]
 pub struct Swap<'info> {
     #[account(mut)]
-    pub user: Signer<'info>,
+    pub owner: Signer<'info>,
 
     #[account(mut)]
     pub pool: Account<'info, LiquidityPool>,
@@ -243,13 +266,13 @@ pub struct Swap<'info> {
 
     #[account(
         mut,
-        constraint = user_source_token.owner == user.key()
+        constraint = user_source_token.owner == owner.key()
     )]
     pub user_source_token: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
-        constraint = user_destination_token.owner == user.key()
+        constraint = user_destination_token.owner == owner.key()
     )]
     pub user_destination_token: InterfaceAccount<'info, TokenAccount>,
 
