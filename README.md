@@ -4,9 +4,9 @@
 
 - [x] Set up Solana development environment
 - [x] Create program skeleton with state and instruction definitions
-- [ ] Implement initialization logic
+- [x] Implement initialization logic
 - [ ] Implement basic user token account management
-- [ ] Create test framework
+- [x] Create test framework
 
 ## Week 2: Deposit, Withdrawal & Pool Management
 
