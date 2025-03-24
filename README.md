@@ -3,7 +3,7 @@
 ## Week 1: Environment Setup & Core Program Structure
 
 - [x] Set up Solana development environment
-- [ ] Create program skeleton with state and instruction definitions
+- [x] Create program skeleton with state and instruction definitions
 - [ ] Implement initialization logic
 - [ ] Implement basic user token account management
 - [ ] Create test framework
