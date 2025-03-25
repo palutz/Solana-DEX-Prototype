@@ -30,3 +30,8 @@
 - [ ] Add deposit/withdrawal interface
 - [ ] Integrate client library with frontend
 - [ ] Test complete flow from UI to on-chain program
+
+## Test coverage
+
+- Dex initialization with incorrect Admin Key is failing
+- Dex initialization with correct Admin Key
