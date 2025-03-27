@@ -102,3 +102,44 @@ solana airdrop 100 <wallet_address> -ul
 
 - Dex initialization with incorrect Admin Key is failing
 - Dex initialization with correct Admin Key
+
+## Deployment
+
+### Prerequisites
+- Node.js (v16 or higher)
+- npm or yarn
+- A Vercel account
+
+### Local Development
+```bash
+# Navigate to the UI directory
+cd purple-ui
+
+# Install dependencies
+npm install
+
+# Start the development server
+npm run dev
+```
+
+### Deploy to Vercel
+```bash
+# Install Vercel CLI globally
+npm install -g vercel
+
+# Navigate to the UI directory
+cd purple-ui
+
+# Deploy to Vercel
+vercel
+
+# Deploy to production
+vercel --prod
+```
+
+<!-- ### Environment Variables
+Make sure to set these environment variables in your Vercel project:
+
+- `VITE_SOLANA_RPC_URL`: Your Solana RPC endpoint
+- `VITE_PROGRAM_ID`: The deployed program ID for the DEX
+- `VITE_SOLANA_NETWORK`: The Solana network to use (mainnet-beta, devnet, etc.) -->

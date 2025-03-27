@@ -1,0 +1,167 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 267 76% 66%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 84.9%;
+    --accent: 273 73% 69%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 25.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 267 76% 66%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border selection:bg-dex-purple/20 selection:text-white;
+  }
+  
+  body {
+    @apply bg-dex-dark text-foreground antialiased overflow-x-hidden;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv02", "cv03";
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply backdrop-blur-xl bg-white/5 border border-white/10 shadow-[0_4px_20px_-8px_rgba(139,92,246,0.3)];
+  }
+  
+  .neo-blur {
+    @apply backdrop-blur-2xl bg-black/40 border border-white/10;
+  }
+  
+  .text-gradient {
+    @apply bg-gradient-to-br from-dex-purple-light via-dex-purple to-dex-purple-dark bg-clip-text text-transparent;
+  }
+  
+  .purple-glow {
+    @apply shadow-[0_0_20px_rgba(139,92,246,0.4)];
+  }
+  
+  .button-primary {
+    @apply bg-gradient-to-r from-dex-purple-dark via-dex-purple to-dex-purple-light 
+           text-white font-medium py-2 px-4 rounded-md transition-all 
+           hover:shadow-[0_0_15px_rgba(139,92,246,0.5)] hover:scale-[1.02]
+           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .button-secondary {
+    @apply glass-card bg-opacity-30 hover:bg-opacity-40 text-white/90 
+           font-medium py-2 px-4 rounded-md transition-all 
+           hover:shadow-[0_0_15px_rgba(139,92,246,0.3)] hover:text-white
+           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .button-outline {
+    @apply border border-dex-purple/50 text-white/80 
+           font-medium py-2 px-4 rounded-md transition-all 
+           hover:bg-dex-purple/10 hover:border-dex-purple hover:text-white
+           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .input-primary {
+    @apply glass-card text-white bg-white/5 bg-opacity-30 border-white/10 
+           py-2 px-4 rounded-md transition-all focus:outline-none
+           focus:bg-white/10 focus:border-dex-purple/40 focus:ring-1 focus:ring-dex-purple/30
+           disabled:opacity-50 disabled:cursor-not-allowed
+           placeholder:text-white/40;
+  }
+
+  .hover-scale {
+    @apply transition-transform duration-200 hover:scale-105;
+  }
+
+  .grid-pattern {
+    background-size: 30px 30px;
+    @apply bg-grid-pattern;
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Wallet adapter button styling */
+.wallet-adapter-button {
+  background: linear-gradient(135deg, rgba(138, 43, 226, 0.7), rgba(123, 31, 162, 0.7)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(10px) !important;
+  font-family: inherit !important;
+  transition: all 0.2s !important;
+  color: white !important;
+}
+
+.wallet-adapter-button:hover {
+  background: linear-gradient(135deg, rgba(138, 43, 226, 0.8), rgba(123, 31, 162, 0.8)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.wallet-adapter-button:not([disabled]):hover {
+  background: linear-gradient(135deg, rgba(138, 43, 226, 0.8), rgba(123, 31, 162, 0.8)) !important;
+}
+
+.wallet-adapter-modal-wrapper {
+  background: rgba(23, 23, 23, 0.9) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.wallet-adapter-modal-button-close {
+  background: rgba(138, 43, 226, 0.5) !important;
+}
+
+.wallet-adapter-modal-title {
+  color: white !important;
+}
+
+.wallet-adapter-modal-list {
+  margin: 0 0 4px !important;
+}
+
+.wallet-adapter-modal-list li {
+  padding: 0 !important;
+}
+
+.wallet-adapter-modal-list-more {
+  color: rgba(138, 43, 226, 1) !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+}
+
+.wallet-adapter-dropdown {
+  position: relative !important;
+  display: inline-block !important;
+}
+
+.wallet-adapter-wrapper {
+  position: relative !important;
+  display: flex !important;
+}

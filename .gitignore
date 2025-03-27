@@ -6,3 +6,27 @@ target/
 node_modules
 test-ledger
 .yarn
+
+# purple-ui specific ignores
+purple-ui/logs
+purple-ui/*.log
+purple-ui/npm-debug.log*
+purple-ui/yarn-debug.log*
+purple-ui/yarn-error.log*
+purple-ui/pnpm-debug.log*
+purple-ui/lerna-debug.log*
+
+purple-ui/node_modules
+purple-ui/dist
+purple-ui/dist-ssr
+purple-ui/*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
