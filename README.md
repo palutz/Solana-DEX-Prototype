@@ -103,7 +103,7 @@ solana airdrop 100 <wallet_address> -ul
 - Dex initialization with incorrect Admin Key is failing
 - Dex initialization with correct Admin Key
 
-## Deployment
+# Frontend Deployment
 
 ### Prerequisites
 - Node.js (v16 or higher)
