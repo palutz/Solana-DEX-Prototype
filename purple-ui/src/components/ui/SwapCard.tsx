@@ -24,13 +24,12 @@ export default function SwapCard() {
   // Update estimated amount when input changes
   useEffect(() => {
     if (swapState.amountFrom && swapState.tokenFrom && swapState.tokenTo) {
-      // In a real implementation, we would call an API to get the price
-      // For now, let's use a simple conversion rate
+      // TODO: Replace with backend functionality to get the price
+      // For now, it's mocking via a simple conversion rate
       const getEstimatedAmount = () => {
         const amount = parseFloat(swapState.amountFrom);
         
-        // Sample conversion rates (in a real app, this would come from an API)
-        // Updated to include all tokens from TOKENS array
+        // TODO: Fetch actual conversion rates from DEX smart contract?
         const rates: Record<string, Record<string, number>> = {
           SOL: { 
             USDC: 100, 
@@ -136,6 +135,12 @@ export default function SwapCard() {
     }
     
     setIsLoading(true);
+    
+    // TODO: Implement actual swap functionality using the dex/ smart contract by
+    // 1. Creating and sending the swap transaction to the blockchain
+    // 2. Handling approval/confirmation from the user's wallet
+    // 3. Waiting for the transaction to be confirmed
+    // 4. Updating UI based on transaction result
     
     // Simulate a swap operation
     toast.promise(
@@ -300,11 +305,13 @@ export default function SwapCard() {
               <div className="flex justify-between">
                 <span className="text-white/70">Minimum received</span>
                 <span className="font-medium">
+                  {/* TODO: calculate actual minimum received based on slippage from DEX contract */}
                   {(parseFloat(swapState.amountTo) * (1 - slippage / 100)).toFixed(6)} {swapState.tokenTo?.symbol}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-white/70">Price impact</span>
+                {/* TODO: calculate actual price impact from DEX contract */}
                 <span className="text-green-400">{'< 0.01%'}</span>
               </div>
               <div className="flex justify-between">

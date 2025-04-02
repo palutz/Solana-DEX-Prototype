@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +36,7 @@ export default function PoolCard() {
       setPoolState(prev => ({
         ...prev,
         depositAmount1: value,
-        // In a real app, calculate based on pool ratio
+        // TODO: Calculate actual token ratio based on pool liquidity from DEX contract
         depositAmount2: value ? (parseFloat(value) * 100).toString() : ''
       }));
     }
@@ -49,6 +48,7 @@ export default function PoolCard() {
       setPoolState(prev => ({
         ...prev,
         withdrawAmount: value,
+        // TODO: calculate actual share percentage from user's LP token balance
         sharePercentage: value ? Math.min(parseFloat(value) * 10, 100) : 0
       }));
     }
@@ -61,6 +61,12 @@ export default function PoolCard() {
     }
     
     setIsLoading(true);
+    
+    // TODO: Implement actual liquidity provision using /dex smart contract by
+    // 1. Getting approval for token transfers
+    // 2. Creating and sending the add liquidity transaction
+    // 3. Waiting for the transaction to be confirmed
+    // 4. Updating UI with the received LP tokens
     
     // Simulate a deposit operation
     toast.promise(
@@ -91,6 +97,12 @@ export default function PoolCard() {
     }
     
     setIsLoading(true);
+    
+    // TODO: Implement actual liquidity withdrawal using DEX smart contract
+    // This would involve:
+    // 1. Creating and sending the remove liquidity transaction
+    // 2. Waiting for the transaction to be confirmed
+    // 3. Updating UI with the received tokens
     
     // Simulate a withdraw operation
     toast.promise(
@@ -205,11 +217,13 @@ export default function PoolCard() {
                     <div className="flex justify-between">
                       <span className="text-white/70">LP Tokens Received (est.)</span>
                       <span className="font-medium">
+                        {/* TODO: Calculate actual LP tokens to be received based on pool math from DEX contract */}
                         {(parseFloat(poolState.depositAmount1) * 0.5).toFixed(6)} LP
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/70">Share of Pool</span>
+                      {/* TODO: Calculate actual pool share from DEX contract */}
                       <span>0.01%</span>
                     </div>
                   </div>

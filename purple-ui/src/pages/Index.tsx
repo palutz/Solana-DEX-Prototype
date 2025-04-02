@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import Background from "@/components/layout/Background";
 import Navbar from "@/components/layout/Navbar";
@@ -95,14 +94,17 @@ export default function Index() {
                   <div className="flex flex-col">
                     <span className="text-2xl font-bold text-dex-purple">$0M+</span>
                     <span className="text-sm text-white/70">Total Value Locked</span>
+                    {/* optional TODO: maybe fetch actual TVL from DEX smart contract or backend API */}
                   </div>
                   <div className="flex flex-col">
                     <span className="text-2xl font-bold text-dex-purple">0K+</span>
                     <span className="text-sm text-white/70">Users</span>
+                    {/* optional TODO: get actual user count */}
                   </div>
                   <div className="flex flex-col">
                     <span className="text-2xl font-bold text-dex-purple">000K+</span>
                     <span className="text-sm text-white/70">Transactions</span>
+                    {/* optionaly TODO: fetch actual transaction count from blockchain */}
                   </div>
                 </div>
               </div>
@@ -110,10 +112,12 @@ export default function Index() {
                 <div className="bg-dex-dark-lighter rounded-xl overflow-hidden shadow-lg h-36 w-40 flex flex-col justify-center items-center animate-float">
                   <div className="text-2xl font-bold text-dex-purple mb-2">0.00%</div>
                   <div className="text-sm text-white/70 text-center px-2">Average Trade Fee</div>
+                  {/* optional TODO: calculate and display actual average trade fee from DEX contract */}
                 </div>
                 <div className="bg-dex-dark-lighter rounded-xl overflow-hidden shadow-lg h-36 w-40 flex flex-col justify-center items-center animate-float" style={{ animationDelay: "-2s" }}>
                   <div className="text-2xl font-bold text-dex-purple mb-2">000ms</div>
                   <div className="text-sm text-white/70 text-center px-2">Average Transaction Time</div>
+                  {/* optional TODO: fetch actual average transaction time from backend analytics */}
                 </div>
               </div>
             </div>

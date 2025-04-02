@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -26,6 +25,9 @@ const App = () => {
   // Set up Solana network and wallets
   const network = WalletAdapterNetwork.Devnet;
   const endpoint = clusterApiUrl(network);
+  // TODO: configure proper network settings based on deployment environment
+  // The DEX should be running on the same network as the frontend
+  
   const wallets = [
     new PhantomWalletAdapter(),
     new SolflareWalletAdapter(),
@@ -35,6 +37,8 @@ const App = () => {
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>
+          {/* TODO: Add custom context provider for DEX state management 
+              This should handle global state related to pools, tokens, and user positions */}
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
               <Toaster />

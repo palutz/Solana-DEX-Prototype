@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -44,6 +43,9 @@ export default function WalletButton() {
   const fetchBalance = async () => {
     try {
       if (publicKey) {
+        // TODO: Add integration with DEX smart contract to get token balances
+        // This should fetch not just SOL balance but also other tokens in the wallet
+        // using the token program from dex/ dir
         const balance = await connection.getBalance(publicKey);
         setWalletState(prevState => ({
           ...prevState,
@@ -58,6 +60,7 @@ export default function WalletButton() {
   // Disconnect wallet handler
   const handleDisconnect = async () => {
     try {
+      // TODO: Add any cleanup operations needed when disconnecting from DEX
       await disconnect();
       toast.success('Wallet disconnected');
     } catch (error) {
@@ -95,6 +98,7 @@ export default function WalletButton() {
           </div>
           <div className="space-y-1">
             <h4 className="text-sm font-medium text-white">Balance</h4>
+            {/* TODO: Display all token balances from DEX, not just SOL */}
             <p className="text-sm text-white">{walletState.balance.toFixed(4)} SOL</p>
           </div>
           <Button 

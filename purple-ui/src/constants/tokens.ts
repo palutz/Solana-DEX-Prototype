@@ -1,5 +1,8 @@
 import { Token, Pool } from "@/types";
 
+// TODO: Replace with actual token data from DEX smart contract
+// These tokens should be fetched from the blockchain or a backend API
+// that interacts with the DEX smart contract in the dex/programs directory
 export const TOKENS: Token[] = [
   {
     id: "solana",
@@ -35,6 +38,9 @@ export const TOKENS: Token[] = [
   }
 ];
 
+// TODO: Replace with actual pool data from DEX smart contract
+// These pools should be fetched from the blockchain or a backend API
+// that provides the current state of liquidity pools from the DEX
 export const POOLS: Pool[] = [
   {
     id: "sol-usdc",
@@ -74,6 +80,7 @@ export const POOLS: Pool[] = [
   }
 ];
 
+// TODO: Implement function to get real-time token data from the blockchain
 export const getTokenBySymbol = (symbol: string): Token | undefined => {
   return TOKENS.find(token => token.symbol.toLowerCase() === symbol.toLowerCase());
 };

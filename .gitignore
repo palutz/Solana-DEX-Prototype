@@ -30,3 +30,4 @@ purple-ui/*.local
 *.njsproj
 *.sln
 *.sw?
+.vercel
