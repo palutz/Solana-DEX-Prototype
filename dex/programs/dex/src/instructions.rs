@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token_interface::{Mint, TokenAccount, TokenInterface},
+};
 
 use crate::DexError;
 
@@ -25,7 +28,35 @@ pub fn _initialize(
 }
 
 pub fn _create_pool(ctx: Context<CreatePool>) -> Result<()> {
-    todo!();
+    let pool = &mut ctx.accounts.pool;
+    let dex_state = &mut ctx.accounts.dex_state;
+    
+    // Initialize pool data
+    pool.token_a_mint = ctx.accounts.token_a_mint.key();
+    pool.token_b_mint = ctx.accounts.token_b_mint.key();
+    pool.token_a_account = ctx.accounts.pool_token_a.key();
+    pool.token_b_account = ctx.accounts.pool_token_b.key();
+    pool.lp_token_mint = ctx.accounts.lp_token_mint.key();
+    
+    // Save the PDA bump for future references
+    pool.bump = ctx.bumps.pool;
+    
+    // Initialize liquidity
+    pool.total_liquidity = 0;
+    
+    // Copy fee settings from DEX state
+    pool.fee_numerator = dex_state.fee_numerator;
+    pool.fee_denominator = dex_state.fee_denominator;
+    
+    // Increment the pools counter in DEX state
+    dex_state.pools_count += 1;
+    
+    msg!("Pool created: {}", pool.key());
+    msg!("Token A Mint: {}", pool.token_a_mint);
+    msg!("Token B Mint: {}", pool.token_b_mint);
+    msg!("LP Token Mint: {}", pool.lp_token_mint);
+    msg!("Owner LP Token Account: {}", ctx.accounts.owner_lp_token.key());
+    
     Ok(())
 }
 
@@ -75,7 +106,7 @@ pub struct CreatePool<'info> {
     pub dex_state: Account<'info, DexState>,
 
     pub token_a_mint: InterfaceAccount<'info, Mint>,
-    pub token_b_mint: InterfaceAccount<'info, Mint>, // Added this missing field
+    pub token_b_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
         init,
@@ -105,6 +136,7 @@ pub struct CreatePool<'info> {
         token::authority = pool,
     )]
     pub pool_token_b: InterfaceAccount<'info, TokenAccount>,
+
     #[account(
         init,
         payer = owner,
@@ -112,7 +144,18 @@ pub struct CreatePool<'info> {
         mint::authority = pool,
     )]
     pub lp_token_mint: InterfaceAccount<'info, Mint>,
+
+    // Create an LP token account for the pool creator automatically
+    #[account(
+        init_if_needed,
+        payer = owner,
+        associated_token::mint = lp_token_mint,
+        associated_token::authority = owner,
+    )]
+    pub owner_lp_token: InterfaceAccount<'info, TokenAccount>,
+
     pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
 }
@@ -158,15 +201,21 @@ pub struct DepositLiquidity<'info> {
     #[account(mut)]
     pub pool: Account<'info, LiquidityPool>,
 
+    // Need to add the actual mint accounts
+    pub token_a_mint: InterfaceAccount<'info, Mint>,
+    pub token_b_mint: InterfaceAccount<'info, Mint>,
+
     #[account(
         mut,
-        constraint = pool_token_a.key() == pool.token_a_account
+        constraint = pool_token_a.key() == pool.token_a_account,
+        constraint = token_a_mint.key() == pool.token_a_mint
     )]
     pub pool_token_a: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
-        constraint = pool_token_b.key() == pool.token_b_account
+        constraint = pool_token_b.key() == pool.token_b_account,
+        constraint = token_b_mint.key() == pool.token_b_mint
     )]
     pub pool_token_b: InterfaceAccount<'info, TokenAccount>,
 
@@ -176,25 +225,36 @@ pub struct DepositLiquidity<'info> {
     )]
     pub lp_token_mint: Box<InterfaceAccount<'info, Mint>>,
 
+    // Now correctly reference the actual account mint fields
     #[account(
-        mut,
-        constraint = user_token_a.owner == owner.key()
+        init_if_needed,
+        payer = owner,
+        associated_token::mint = token_a_mint,
+        associated_token::authority = owner,
     )]
     pub user_token_a: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        mut,
-        constraint = user_token_b.owner == owner.key()
+        init_if_needed,
+        payer = owner,
+        associated_token::mint = token_b_mint,
+        associated_token::authority = owner,
     )]
     pub user_token_b: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        mut,
-        constraint = user_lp_token.owner == owner.key()
+        init_if_needed,
+        payer = owner,
+        associated_token::mint = lp_token_mint,
+        associated_token::authority = owner,
     )]
     pub user_lp_token: InterfaceAccount<'info, TokenAccount>,
 
+    // Add the required programs
     pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
@@ -205,15 +265,21 @@ pub struct WithdrawLiquidity<'info> {
     #[account(mut)]
     pub pool: Account<'info, LiquidityPool>,
 
+    // Add mint accounts
+    pub token_a_mint: InterfaceAccount<'info, Mint>,
+    pub token_b_mint: InterfaceAccount<'info, Mint>,
+
     #[account(
         mut,
-        constraint = pool_token_a.key() == pool.token_a_account
+        constraint = pool_token_a.key() == pool.token_a_account,
+        constraint = token_a_mint.key() == pool.token_a_mint
     )]
     pub pool_token_a: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
-        constraint = pool_token_b.key() == pool.token_b_account
+        constraint = pool_token_b.key() == pool.token_b_account,
+        constraint = token_b_mint.key() == pool.token_b_mint
     )]
     pub pool_token_b: InterfaceAccount<'info, TokenAccount>,
 
@@ -223,25 +289,36 @@ pub struct WithdrawLiquidity<'info> {
     )]
     pub lp_token_mint: Box<InterfaceAccount<'info, Mint>>,
 
+    // Correctly reference the actual account mint fields
     #[account(
-        mut,
-        constraint = user_token_a.owner == owner.key()
+        init_if_needed,
+        payer = owner,
+        associated_token::mint = token_a_mint,
+        associated_token::authority = owner,
     )]
     pub user_token_a: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        mut,
-        constraint = user_token_b.owner == owner.key()
+        init_if_needed,
+        payer = owner,
+        associated_token::mint = token_b_mint,
+        associated_token::authority = owner,
     )]
     pub user_token_b: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        mut,
-        constraint = user_lp_token.owner == owner.key()
+        init_if_needed,
+        payer = owner,
+        associated_token::mint = lp_token_mint,
+        associated_token::authority = owner,
     )]
     pub user_lp_token: InterfaceAccount<'info, TokenAccount>,
 
+    // Add the required programs
     pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
@@ -251,30 +328,48 @@ pub struct Swap<'info> {
 
     #[account(mut)]
     pub pool: Account<'info, LiquidityPool>,
+    
+    // We need to specify which token we're swapping from and to
+    // This can be either token_a_mint or token_b_mint
+    pub source_mint: InterfaceAccount<'info, Mint>,
+    pub destination_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
         mut,
-        constraint = pool_token_a.key() == pool.token_a_account
+        constraint = pool_token_a.key() == pool.token_a_account,
+        constraint = (source_mint.key() == pool.token_a_mint || 
+                     destination_mint.key() == pool.token_a_mint)
     )]
     pub pool_token_a: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
-        constraint = pool_token_b.key() == pool.token_b_account
+        constraint = pool_token_b.key() == pool.token_b_account,
+        constraint = (source_mint.key() == pool.token_b_mint || 
+                     destination_mint.key() == pool.token_b_mint)
     )]
     pub pool_token_b: InterfaceAccount<'info, TokenAccount>,
 
+    // Use the actual mint references for the user accounts
     #[account(
-        mut,
-        constraint = user_source_token.owner == owner.key()
+        init_if_needed,
+        payer = owner,
+        associated_token::mint = source_mint,
+        associated_token::authority = owner,
     )]
     pub user_source_token: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        mut,
-        constraint = user_destination_token.owner == owner.key()
+        init_if_needed,
+        payer = owner,
+        associated_token::mint = destination_mint,
+        associated_token::authority = owner,
     )]
     pub user_destination_token: InterfaceAccount<'info, TokenAccount>,
 
+    // Add the required programs
     pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
 }

@@ -59,6 +59,7 @@ describe("DEX tests", () => {
 
   // -------------------- Test Cases --------------------
 
+  // NOTE: Test case 1
   it("Dex initialization with incorrect Admin Key is failing", async () => {
     console.log("\n");
     // Derive a Dex state PDA using an unauthorized attacker's public key.
@@ -90,6 +91,7 @@ describe("DEX tests", () => {
     }
   });
 
+  // NOTE: Test case 2
   it("Dex initialization with correct Admin Key", async () => {
     // Initialize the DexState account.
     // Define the accounts required to initialize the DexState.

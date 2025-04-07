@@ -72,7 +72,7 @@ solana airdrop 100 <wallet_address> -ul
 - [x] Set up Solana development environment
 - [x] Create program skeleton with state and instruction definitions
 - [x] Implement initialization logic
-- [ ] Implement basic user token account management
+- [x] Implement basic user token account management
 - [x] Create test framework
 
 ## Week 2: Deposit, Withdrawal & Pool Management
