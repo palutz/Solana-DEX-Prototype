@@ -78,7 +78,7 @@ solana airdrop 100 <wallet_address> -ul
 ## Week 2: Deposit, Withdrawal & Pool Management
 
 - [ ] Implement deposit/withdrawal functions
-- [ ] Implement pool initialization logic
+- [x] Implement pool initialization logic
 - [ ] Develop liquidity provision/withdrawal functions
 - [ ] Write tests for these functions
 - [ ] Start building simple client integration
