@@ -26,8 +26,12 @@ pub mod dex {
         instructions::_create_pool(ctx)
     }
 
-    pub fn deposit_liquidity(ctx: Context<DepositLiquidity>) -> Result<()> {
-        instructions::_deposit_liquidity(ctx)
+    pub fn deposit_liquidity(
+        ctx: Context<DepositLiquidity>,
+        token_a_amount: u64,
+        token_b_amount: u64,
+    ) -> Result<()> {
+        instructions::_deposit_liquidity(ctx, token_a_amount, token_b_amount)
     }
 
     pub fn withdraw_liquidity(ctx: Context<WithdrawLiquidity>) -> Result<()> {
@@ -40,7 +44,6 @@ pub mod dex {
 }
 
 /// Defines custom error codes for the DEX program.
-/// Provides clear and descriptive error messages for various failure scenarios.
 #[error_code]
 pub enum DexError {
     // Triggered when a non-admin attempts an admin-only action.
@@ -49,4 +52,10 @@ pub enum DexError {
     // Triggered when the fee numerator is greater than or equal to the fee denominator.
     #[msg("Invalid fees.")]
     InvalidFees,
+    // Triggered when an amount is zero or otherwise invalid
+    // #[msg("Invalid amount.")]
+    // InvalidAmount,
+    // Triggered when liquidity is insufficient for an operation
+    #[msg("Insufficient liquidity.")]
+    InsufficientLiquidity,
 }

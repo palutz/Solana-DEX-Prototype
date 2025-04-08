@@ -90,7 +90,7 @@ solana airdrop 100 <wallet_address> -ul
 - [ ] Complete end-to-end testing on Solana devnet
 - [ ] Refine error handling and input validation
 
-## Week 4: (?Frontend & Integration)
+## Week 4: (Frontend & Integration)
 
 - [ ] Build React frontend with wallet connection
 - [ ] Create swap interface component
@@ -102,6 +102,7 @@ solana airdrop 100 <wallet_address> -ul
 
 - Dex initialization with incorrect Admin Key is failing
 - Dex initialization with correct Admin Key
+- Liquidity pool creation
 
 # Frontend Deployment
 
