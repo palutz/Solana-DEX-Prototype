@@ -312,6 +312,7 @@ describe("DEX tests", () => {
     }
   });
 
+  // NOTE: Test case 4
   it("Depositing and withdrawing liquidity", async () => {
     try {
       // First, create token accounts for the pool owner

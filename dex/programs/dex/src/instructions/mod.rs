@@ -226,7 +226,6 @@ pub fn perform_liquidity_withdrawal(ctx: Context<WithdrawLiquidity>, lp_amount: 
 
 pub fn swap_tokens(ctx: Context<Swap>) -> Result<()> {
     todo!();
-    Ok(())
 }
 
 #[derive(Accounts)]

@@ -102,7 +102,8 @@ solana airdrop 100 <wallet_address> -ul
 
 - Dex initialization with incorrect Admin Key is failing
 - Dex initialization with correct Admin Key
-- Liquidity pool creation
+- Creating a liquidity pool
+- Depositing and withdrawing liquidity
 
 # Frontend Deployment
 
