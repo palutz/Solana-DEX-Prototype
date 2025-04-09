@@ -11,6 +11,11 @@ use anchor_spl::{
 
 use crate::DexError;
 
+// NOTE: Functions
+/* 
+ * Sets up the DEX global state with admin access and fee configuration
+ * Only the designated admin can call this function
+ */
 pub fn initialize_dex(
     ctx: Context<Initialize>,
     fee_numerator: u64,
@@ -32,6 +37,10 @@ pub fn initialize_dex(
     Ok(())
 }
 
+/*
+ * Creates a new trading pair with custom LP tokens
+ * Anyone can create a pool for any token pair
+ */
 pub fn create_liquidity_pool(ctx: Context<CreatePool>) -> Result<()> {
     let pool = &mut ctx.accounts.pool;
     let dex_state = &mut ctx.accounts.dex_state;
@@ -65,6 +74,10 @@ pub fn create_liquidity_pool(ctx: Context<CreatePool>) -> Result<()> {
     Ok(())
 }
 
+/*
+ * Adds liquidity to a pool and mints LP tokens
+ * The first deposit sets the initial price ratio
+ */
 pub fn perform_liquidity_deposit(ctx: Context<DepositLiquidity>, token_a_amount: u64, token_b_amount: u64) -> Result<()> {
     // Get references to all accounts
     let pool = &mut ctx.accounts.pool;
@@ -142,6 +155,10 @@ pub fn perform_liquidity_deposit(ctx: Context<DepositLiquidity>, token_a_amount:
     Ok(())
 }
 
+/*
+ * Removes liquidity from a pool by burning LP tokens
+ * Returns tokens proportional to the share of the pool being withdrawn
+ */
 pub fn perform_liquidity_withdrawal(ctx: Context<WithdrawLiquidity>, lp_amount: u64) -> Result<()> {
     // Get references to all accounts
     let pool = &mut ctx.accounts.pool;
@@ -224,10 +241,15 @@ pub fn perform_liquidity_withdrawal(ctx: Context<WithdrawLiquidity>, lp_amount: 
     Ok(())
 }
 
+/*
+ * Swaps one token for another using the constant product formula
+ * Not yet implemented
+ */
 pub fn swap_tokens(ctx: Context<Swap>) -> Result<()> {
     todo!();
 }
 
+// NOTE: Types
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(
