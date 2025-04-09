@@ -352,14 +352,23 @@ impl DexState {
 
 #[account]
 pub struct LiquidityPool {
+    // Token A mint address
     pub token_a_mint: Pubkey,
+    // Token B mint address
     pub token_b_mint: Pubkey,
+    // Pool's token A account holding reserves
     pub token_a_account: Pubkey,
+    // Pool's token B account holding reserves
     pub token_b_account: Pubkey,
+    // LP token mint issued to liquidity providers
     pub lp_token_mint: Pubkey,
+    // Bump seed for PDA derivation
     pub bump: u8,
+    // Total LP tokens minted for this pool
     pub total_liquidity: u64,
+    // Fee numerator (e.g. 10 for a 1% fee)
     pub fee_numerator: u64,
+    // Fee denominator (e.g. 1000 for a 1% fee)
     pub fee_denominator: u64,
 }
 
@@ -370,16 +379,19 @@ impl LiquidityPool {
 
 #[derive(Accounts)]
 pub struct DepositLiquidity<'info> {
+    // Liquidity provider 
     #[account(mut)]
     pub owner: Signer<'info>,
 
+    // Target pool for deposit
     #[account(mut)]
     pub pool: Account<'info, LiquidityPool>,
 
-    // Need to add the actual mint accounts
+    // Token mint definitions
     pub token_a_mint: InterfaceAccount<'info, Mint>,
     pub token_b_mint: InterfaceAccount<'info, Mint>,
 
+    // Pool's token A reserve account
     #[account(
         mut,
         constraint = pool_token_a.key() == pool.token_a_account,
@@ -387,6 +399,7 @@ pub struct DepositLiquidity<'info> {
     )]
     pub pool_token_a: InterfaceAccount<'info, TokenAccount>,
 
+    // Pool's token B reserve account
     #[account(
         mut,
         constraint = pool_token_b.key() == pool.token_b_account,
@@ -394,13 +407,14 @@ pub struct DepositLiquidity<'info> {
     )]
     pub pool_token_b: InterfaceAccount<'info, TokenAccount>,
 
+    // LP token mint to issue shares
     #[account(
         mut,
         constraint = lp_token_mint.key() == pool.lp_token_mint
     )]
     pub lp_token_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    // Now correctly reference the actual account mint fields
+    // User's token A source account
     #[account(
         init_if_needed,
         payer = owner,
@@ -409,6 +423,7 @@ pub struct DepositLiquidity<'info> {
     )]
     pub user_token_a: InterfaceAccount<'info, TokenAccount>,
 
+    // User's token B source account
     #[account(
         init_if_needed,
         payer = owner,
@@ -417,6 +432,7 @@ pub struct DepositLiquidity<'info> {
     )]
     pub user_token_b: InterfaceAccount<'info, TokenAccount>,
 
+    // User's account to receive LP tokens
     #[account(
         init_if_needed,
         payer = owner,
@@ -425,7 +441,7 @@ pub struct DepositLiquidity<'info> {
     )]
     pub user_lp_token: InterfaceAccount<'info, TokenAccount>,
 
-    // Add the required programs
+    // Required programs
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
@@ -434,16 +450,19 @@ pub struct DepositLiquidity<'info> {
 
 #[derive(Accounts)]
 pub struct WithdrawLiquidity<'info> {
+    // LP owner removing liquidity
     #[account(mut)]
     pub owner: Signer<'info>,
 
+    // Pool to withdraw from
     #[account(mut)]
     pub pool: Account<'info, LiquidityPool>,
 
-    // Add mint accounts
+    // Token mint addresses
     pub token_a_mint: InterfaceAccount<'info, Mint>,
     pub token_b_mint: InterfaceAccount<'info, Mint>,
 
+    // Pool's token A reserve account
     #[account(
         mut,
         constraint = pool_token_a.key() == pool.token_a_account,
@@ -451,6 +470,7 @@ pub struct WithdrawLiquidity<'info> {
     )]
     pub pool_token_a: InterfaceAccount<'info, TokenAccount>,
 
+    // Pool's token B reserve account
     #[account(
         mut,
         constraint = pool_token_b.key() == pool.token_b_account,
@@ -458,13 +478,14 @@ pub struct WithdrawLiquidity<'info> {
     )]
     pub pool_token_b: InterfaceAccount<'info, TokenAccount>,
 
+    // LP token mint to burn from
     #[account(
         mut,
         constraint = lp_token_mint.key() == pool.lp_token_mint
     )]
     pub lp_token_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    // Correctly reference the actual account mint fields
+    // User's token A account to receive funds
     #[account(
         init_if_needed,
         payer = owner,
@@ -473,6 +494,7 @@ pub struct WithdrawLiquidity<'info> {
     )]
     pub user_token_a: InterfaceAccount<'info, TokenAccount>,
 
+    // User's token B account to receive funds
     #[account(
         init_if_needed,
         payer = owner,
@@ -481,6 +503,7 @@ pub struct WithdrawLiquidity<'info> {
     )]
     pub user_token_b: InterfaceAccount<'info, TokenAccount>,
 
+    // User's LP tokens to burn
     #[account(
         init_if_needed,
         payer = owner,
@@ -489,7 +512,7 @@ pub struct WithdrawLiquidity<'info> {
     )]
     pub user_lp_token: InterfaceAccount<'info, TokenAccount>,
 
-    // Add the required programs
+    // Required programs
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
@@ -498,17 +521,22 @@ pub struct WithdrawLiquidity<'info> {
 
 #[derive(Accounts)]
 pub struct Swap<'info> {
+    // User swapping tokens and paying for tx fees
     #[account(mut)]
     pub owner: Signer<'info>,
 
+    // Pool that contains the trading pair
     #[account(mut)]
     pub pool: Account<'info, LiquidityPool>,
     
-    // We need to specify which token we're swapping from and to
-    // This can be either token_a_mint or token_b_mint
+    // Token the user is swapping from
     pub source_mint: InterfaceAccount<'info, Mint>,
+    
+    // Token the user is swapping to
     pub destination_mint: InterfaceAccount<'info, Mint>,
 
+    // Pool's token A account 
+    // Verifies account matches pool record and is part of the swap
     #[account(
         mut,
         constraint = pool_token_a.key() == pool.token_a_account,
@@ -517,6 +545,8 @@ pub struct Swap<'info> {
     )]
     pub pool_token_a: InterfaceAccount<'info, TokenAccount>,
 
+    // Pool's token B account
+    // Verifies account matches pool record and is part of the swap
     #[account(
         mut,
         constraint = pool_token_b.key() == pool.token_b_account,
@@ -525,7 +555,7 @@ pub struct Swap<'info> {
     )]
     pub pool_token_b: InterfaceAccount<'info, TokenAccount>,
 
-    // Use the actual mint references for the user accounts
+    // User's source token account (where tokens come from)
     #[account(
         init_if_needed,
         payer = owner,
@@ -534,6 +564,7 @@ pub struct Swap<'info> {
     )]
     pub user_source_token: InterfaceAccount<'info, TokenAccount>,
 
+    // User's destination token account (where tokens go)
     #[account(
         init_if_needed,
         payer = owner,
@@ -542,7 +573,7 @@ pub struct Swap<'info> {
     )]
     pub user_destination_token: InterfaceAccount<'info, TokenAccount>,
 
-    // Add the required programs
+    // Required program references
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
