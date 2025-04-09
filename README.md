@@ -65,7 +65,7 @@ Each account must be rent-exempt (have minimum SOL balance). To fund accounts on
 solana airdrop 100 <wallet_address> -ul
 ```
 
-# Roadmap
+# NOTE: Roadmap
 
 ## Week 1: Environment Setup & Core Program Structure
 

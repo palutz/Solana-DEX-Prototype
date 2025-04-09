@@ -1,3 +1,6 @@
+mod deposit;
+use deposit::*;
+
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
@@ -6,7 +9,7 @@ use anchor_spl::{
 
 use crate::DexError;
 
-pub fn _initialize(
+pub fn initialize_dex(
     ctx: Context<Initialize>,
     fee_numerator: u64,
     fee_denominator: u64,
@@ -27,7 +30,7 @@ pub fn _initialize(
     Ok(())
 }
 
-pub fn _create_pool(ctx: Context<CreatePool>) -> Result<()> {
+pub fn create_liquidity_pool(ctx: Context<CreatePool>) -> Result<()> {
     let pool = &mut ctx.accounts.pool;
     let dex_state = &mut ctx.accounts.dex_state;
     
@@ -60,11 +63,14 @@ pub fn _create_pool(ctx: Context<CreatePool>) -> Result<()> {
     Ok(())
 }
 
-pub fn _deposit_liquidity(ctx: Context<DepositLiquidity>, token_a_amount: u64, token_b_amount: u64) -> Result<()> {
+pub fn perform_liquidity_deposit(ctx: Context<DepositLiquidity>, token_a_amount: u64, token_b_amount: u64) -> Result<()> {
+    // Get references to all accounts
     let pool = &mut ctx.accounts.pool;
     let pool_token_a = &mut ctx.accounts.pool_token_a;
     let pool_token_b = &mut ctx.accounts.pool_token_b;
     let lp_token_mint = &mut ctx.accounts.lp_token_mint;
+    let token_a_mint = &ctx.accounts.token_a_mint;
+    let token_b_mint = &ctx.accounts.token_b_mint;
     let user_token_a = &ctx.accounts.user_token_a;
     let user_token_b = &ctx.accounts.user_token_b;
     let user_lp_token = &ctx.accounts.user_lp_token;
@@ -74,119 +80,55 @@ pub fn _deposit_liquidity(ctx: Context<DepositLiquidity>, token_a_amount: u64, t
     // Get current pool reserves
     let reserve_a = pool_token_a.amount;
     let reserve_b = pool_token_b.amount;
-    
-    // Calculate LP tokens to mint
-    let lp_tokens_to_mint: u64;
-    
-    // If this is the first deposit (pool is empty), use the geometric mean of the deposits
-    if pool.total_liquidity == 0 {
-        // Calculate initial liquidity as the geometric mean of token amounts
-        // This helps prevent price manipulation on the first deposit
-        // Since there's no checked_sqrt for u128, we'll implement a safe square root calculation
-        let product = (token_a_amount as u128)
-            .checked_mul(token_b_amount as u128)
-            .unwrap();
-            
-        // Manual square root calculation (binary search approach)
-        let mut result: u128 = 0;
-        let mut a = 0;
-        let mut b = product;
-        
-        while a <= b {
-            let mid = a.checked_add(b).unwrap() / 2;
-            let mid_squared = mid.checked_mul(mid).unwrap();
-            
-            match mid_squared.cmp(&product) {
-                std::cmp::Ordering::Equal => {
-                    result = mid;
-                    break;
-                },
-                std::cmp::Ordering::Less => {
-                    a = mid.checked_add(1).unwrap();
-                    result = mid;
-                },
-                std::cmp::Ordering::Greater => {
-                    b = mid.checked_sub(1).unwrap();
-                }
-            }
-        }
-        
-        lp_tokens_to_mint = result as u64;
-        
-        // Make sure we're minting a non-zero amount
-        require!(lp_tokens_to_mint > 0, DexError::InsufficientLiquidity);
+
+    // Calculate LP tokens to mint based on current pool state
+    let lp_tokens_to_mint = if pool.total_liquidity == 0 {
+        // For first deposit, calculate using geometric mean
+        calculate_initial_liquidity(token_a_amount, token_b_amount)?
     } else {
-        // For subsequent deposits, LP tokens are minted proportionally to the existing reserves
-        // Use the smaller of the two proportions to prevent price manipulation
-        let lp_tokens_by_a = (token_a_amount as u128)
-            .checked_mul(pool.total_liquidity as u128)
-            .unwrap()
-            .checked_div(reserve_a as u128)
-            .unwrap() as u64;
-            
-        let lp_tokens_by_b = (token_b_amount as u128)
-            .checked_mul(pool.total_liquidity as u128)
-            .unwrap()
-            .checked_div(reserve_b as u128)
-            .unwrap() as u64;
-            
-        // Use the minimum to maintain the price ratio
-        lp_tokens_to_mint = std::cmp::min(lp_tokens_by_a, lp_tokens_by_b);
-        
-        // Make sure we're minting a non-zero amount
-        require!(lp_tokens_to_mint > 0, DexError::InsufficientLiquidity);
-    }
+        // For subsequent deposits, calculate proportionally
+        calculate_proportional_liquidity(
+            token_a_amount, 
+            token_b_amount,
+            reserve_a,
+            reserve_b,
+            pool.total_liquidity
+        )?
+    };
     
-    // Transfer tokens from user to pool
-    anchor_spl::token_interface::transfer(
-        CpiContext::new(
-            token_program.to_account_info(),
-            anchor_spl::token_interface::Transfer {
-                from: user_token_a.to_account_info(),
-                to: pool_token_a.to_account_info(),
-                authority: owner.to_account_info(),
-            },
-        ),
-        token_a_amount,
+    // Transfer both tokens from user to pool
+    // Token A
+    transfer_user_tokens_to_pool(
+        token_a_mint,
+        token_program,
+        user_token_a,
+        pool_token_a,
+        owner,
+        token_a_amount
     )?;
     
-    anchor_spl::token_interface::transfer(
-        CpiContext::new(
-            token_program.to_account_info(),
-            anchor_spl::token_interface::Transfer {
-                from: user_token_b.to_account_info(),
-                to: pool_token_b.to_account_info(),
-                authority: owner.to_account_info(),
-            },
-        ),
-        token_b_amount,
+    // Token B
+    transfer_user_tokens_to_pool(
+        token_b_mint,
+        token_program,
+        user_token_b,
+        pool_token_b,
+        owner,
+        token_b_amount
     )?;
     
     // Mint LP tokens to user
-    // Create the PDA signer for the mint operation
-    let pool_seeds = &[
-        b"liquidity_pool",
-        pool.token_a_mint.as_ref(),
-        pool.token_b_mint.as_ref(),
-        &[pool.bump],
-    ];
-    let signer = &[&pool_seeds[..]];
-    
-    anchor_spl::token_interface::mint_to(
-        CpiContext::new_with_signer(
-            token_program.to_account_info(),
-            anchor_spl::token_interface::MintTo {
-                mint: lp_token_mint.to_account_info(),
-                to: user_lp_token.to_account_info(),
-                authority: pool.to_account_info(),
-            },
-            signer,
-        ),
-        lp_tokens_to_mint,
+    mint_lp_tokens_to_user(
+        token_program,
+        lp_token_mint,
+        user_lp_token,
+        pool,
+        lp_tokens_to_mint
     )?;
     
     // Update pool total liquidity
-    pool.total_liquidity = pool.total_liquidity.checked_add(lp_tokens_to_mint).unwrap();
+    pool.total_liquidity = pool.total_liquidity.checked_add(lp_tokens_to_mint)
+        .ok_or(error!(DexError::InsufficientLiquidity))?;
     
     msg!(
         "Deposited {} token A and {} token B for {} LP tokens",
@@ -198,12 +140,12 @@ pub fn _deposit_liquidity(ctx: Context<DepositLiquidity>, token_a_amount: u64, t
     Ok(())
 }
 
-pub fn _withdraw_liquidity(ctx: Context<WithdrawLiquidity>) -> Result<()> {
+pub fn perform_liquidity_widthdrawal(ctx: Context<WithdrawLiquidity>) -> Result<()> {
     todo!();
     Ok(())
 }
 
-pub fn _swap(ctx: Context<Swap>) -> Result<()> {
+pub fn swap_tokens(ctx: Context<Swap>) -> Result<()> {
     todo!();
     Ok(())
 }

@@ -19,11 +19,11 @@ pub mod dex {
         fee_numerator: u64,
         fee_denominator: u64,
     ) -> Result<()> {
-        instructions::_initialize(ctx, fee_numerator, fee_denominator)
+        instructions::initialize_dex(ctx, fee_numerator, fee_denominator)
     }
 
     pub fn create_pool(ctx: Context<CreatePool>) -> Result<()> {
-        instructions::_create_pool(ctx)
+        instructions::create_liquidity_pool(ctx)
     }
 
     pub fn deposit_liquidity(
@@ -31,15 +31,15 @@ pub mod dex {
         token_a_amount: u64,
         token_b_amount: u64,
     ) -> Result<()> {
-        instructions::_deposit_liquidity(ctx, token_a_amount, token_b_amount)
+        instructions::perform_liquidity_deposit(ctx, token_a_amount, token_b_amount)
     }
 
     pub fn withdraw_liquidity(ctx: Context<WithdrawLiquidity>) -> Result<()> {
-        instructions::_withdraw_liquidity(ctx)
+        instructions::perform_liquidity_widthdrawal(ctx)
     }
 
     pub fn swap(ctx: Context<Swap>) -> Result<()> {
-        instructions::_swap(ctx)
+        instructions::swap_tokens(ctx)
     }
 }
 
