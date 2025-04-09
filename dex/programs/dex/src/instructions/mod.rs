@@ -1,5 +1,7 @@
 mod deposit;
+mod withdrawal;
 use deposit::*;
+use withdrawal::*;
 
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -140,8 +142,85 @@ pub fn perform_liquidity_deposit(ctx: Context<DepositLiquidity>, token_a_amount:
     Ok(())
 }
 
-pub fn perform_liquidity_widthdrawal(ctx: Context<WithdrawLiquidity>) -> Result<()> {
-    todo!();
+pub fn perform_liquidity_withdrawal(ctx: Context<WithdrawLiquidity>, lp_amount: u64) -> Result<()> {
+    // Get references to all accounts
+    let pool = &mut ctx.accounts.pool;
+    let pool_token_a = &mut ctx.accounts.pool_token_a;
+    let pool_token_b = &mut ctx.accounts.pool_token_b;
+    let lp_token_mint = &mut ctx.accounts.lp_token_mint;
+    let token_a_mint = &ctx.accounts.token_a_mint;
+    let token_b_mint = &ctx.accounts.token_b_mint;
+    let user_token_a = &ctx.accounts.user_token_a;
+    let user_token_b = &ctx.accounts.user_token_b;
+    let user_lp_token = &ctx.accounts.user_lp_token;
+    let owner = &ctx.accounts.owner;
+    let token_program = &ctx.accounts.token_program;
+
+    // Get current pool reserves
+    let reserve_a = pool_token_a.amount;
+    let reserve_b = pool_token_b.amount;
+    
+    // Ensure user has enough LP tokens
+    require!(
+        user_lp_token.amount >= lp_amount,
+        DexError::InsufficientLiquidity
+    );
+    
+    // Ensure pool has enough total liquidity
+    require!(
+        pool.total_liquidity >= lp_amount,
+        DexError::InsufficientLiquidity
+    );
+
+    // Calculate token amounts to withdraw based on user's share
+    let (token_a_amount, token_b_amount) = calculate_withdrawal_amounts(
+        lp_amount,
+        reserve_a,
+        reserve_b,
+        pool.total_liquidity
+    )?;
+    
+    // Burn user's LP tokens
+    burn_lp_tokens(
+        token_program,
+        lp_token_mint,
+        user_lp_token,
+        owner,
+        lp_amount
+    )?;
+    
+    // Transfer tokens from pool to user
+    // Token A
+    transfer_pool_tokens_to_user(
+        token_a_mint,
+        token_program,
+        pool_token_a,
+        user_token_a,
+        pool,
+        token_a_amount
+    )?;
+    
+    // Token B
+    transfer_pool_tokens_to_user(
+        token_b_mint,
+        token_program,
+        pool_token_b,
+        user_token_b,
+        pool,
+        token_b_amount
+    )?;
+    
+    // Update pool total liquidity
+    pool.total_liquidity = pool.total_liquidity.checked_sub(lp_amount)
+        .ok_or(error!(DexError::InsufficientLiquidity))?;
+    
+    msg!(
+        "Withdrawn {} token A and {} token B by burning {} LP tokens",
+        token_a_amount,
+        token_b_amount,
+        lp_amount
+    );
+    
     Ok(())
 }
 

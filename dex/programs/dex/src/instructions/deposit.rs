@@ -24,7 +24,7 @@ pub(crate) fn transfer_user_tokens_to_pool<'info>(
     anchor_spl::token_interface::transfer_checked(
         cpi_ctx,
         amount,
-        0
+        mint.decimals
     )
 }
 

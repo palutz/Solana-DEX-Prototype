@@ -34,8 +34,8 @@ pub mod dex {
         instructions::perform_liquidity_deposit(ctx, token_a_amount, token_b_amount)
     }
 
-    pub fn withdraw_liquidity(ctx: Context<WithdrawLiquidity>) -> Result<()> {
-        instructions::perform_liquidity_widthdrawal(ctx)
+    pub fn withdraw_liquidity(ctx: Context<WithdrawLiquidity>, lp_amount: u64) -> Result<()> {
+        instructions::perform_liquidity_withdrawal(ctx, lp_amount)
     }
 
     pub fn swap(ctx: Context<Swap>) -> Result<()> {

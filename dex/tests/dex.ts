@@ -8,6 +8,7 @@ import {
   TOKEN_2022_PROGRAM_ID,
   createMint,
   getMint,
+  createMintToInstruction,
 } from "@solana/spl-token";
 import {
   Connection,
@@ -307,6 +308,236 @@ describe("DEX tests", () => {
       console.log("Pool creation test passed with all validations");
     } catch (error) {
       console.error("Error creating pool:", error);
+      throw error;
+    }
+  });
+
+  it("Depositing and withdrawing liquidity", async () => {
+    try {
+      // First, create token accounts for the pool owner
+      console.log("Creating token accounts for the pool owner...");
+
+      // Calculate the token accounts
+      const ownerTokenA = getAssociatedTokenAddressSync(
+        tokenAMint,
+        poolOwner.publicKey,
+        false,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_PROGRAM_ID
+      );
+
+      const ownerTokenB = getAssociatedTokenAddressSync(
+        tokenBMint,
+        poolOwner.publicKey,
+        false,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_PROGRAM_ID
+      );
+
+      // Calculate LP token account
+      const [poolPda] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("liquidity_pool"),
+          tokenAMint.toBuffer(),
+          tokenBMint.toBuffer(),
+        ],
+        program.programId
+      );
+
+      // Fetch the pool to get the LP token mint
+      const poolAccount = await program.account.liquidityPool.fetch(poolPda);
+      const lpTokenMint = poolAccount.lpTokenMint;
+
+      const ownerLpToken = getAssociatedTokenAddressSync(
+        lpTokenMint,
+        poolOwner.publicKey,
+        false,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_PROGRAM_ID
+      );
+
+      // Create instructions to initialize owner token accounts
+      const createOwnerTokenAIx = createAssociatedTokenAccountInstruction(
+        poolOwner.publicKey,  // payer
+        ownerTokenA,          // associatedToken
+        poolOwner.publicKey,  // owner
+        tokenAMint,           // mint
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_PROGRAM_ID
+      );
+
+      const createOwnerTokenBIx = createAssociatedTokenAccountInstruction(
+        poolOwner.publicKey,  // payer
+        ownerTokenB,          // associatedToken
+        poolOwner.publicKey,  // owner
+        tokenBMint,           // mint
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_PROGRAM_ID
+      );
+
+      // Create and send a transaction to initialize the token accounts
+      const setupTx = new Transaction().add(
+        createOwnerTokenAIx,
+        createOwnerTokenBIx
+      );
+
+      // Send the setup transaction
+      const setupTxId = await provider.sendAndConfirm(setupTx, [poolOwner]);
+      console.log(`Owner token accounts created. Transaction ID: ${setupTxId}`);
+
+      // Mint some tokens to the pool owner
+      // For Token A
+      const mintAIx = createMintToInstruction(
+        tokenAMint,             // mint
+        ownerTokenA,            // destination
+        poolOwner.publicKey,    // authority
+        1000000,                // amount (1 token with 6 decimals)
+        [],                     // multiSigners (empty array if not using multisig)
+        TOKEN_2022_PROGRAM_ID   // programId
+      );
+
+      // For Token B
+      const mintBIx = createMintToInstruction(
+        tokenBMint,             // mint
+        ownerTokenB,            // destination
+        poolOwner.publicKey,    // authority
+        2000000,                // amount (2 tokens with 6 decimals)
+        [],                     // multiSigners (empty array if not using multisig)
+        TOKEN_2022_PROGRAM_ID   // programId
+      );
+
+      // Send mint transactions
+      const mintTx = new Transaction().add(mintAIx, mintBIx);
+      const mintTxId = await provider.sendAndConfirm(mintTx, [poolOwner]);
+      console.log(`Tokens minted to owner. Transaction ID: ${mintTxId}`);
+
+      // Calculate the pool accounts
+      const poolTokenA = getAssociatedTokenAddressSync(
+        tokenAMint,
+        poolPda,
+        true,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_PROGRAM_ID
+      );
+
+      const poolTokenB = getAssociatedTokenAddressSync(
+        tokenBMint,
+        poolPda,
+        true,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_PROGRAM_ID
+      );
+
+      // Define deposit accounts
+      const depositAccounts = {
+        owner: poolOwner.publicKey,
+        pool: poolPda,
+        tokenAMint: tokenAMint,
+        tokenBMint: tokenBMint,
+        poolTokenA: poolTokenA,
+        poolTokenB: poolTokenB,
+        lpTokenMint: lpTokenMint,
+        userTokenA: ownerTokenA,
+        userTokenB: ownerTokenB,
+        userLpToken: ownerLpToken,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+      };
+
+      // Deposit liquidity
+      const tokenAAmount = 500000; // 0.5 tokens
+      const tokenBAmount = 1000000; // 1 token
+
+      const depositTxId = await program.methods
+        .depositLiquidity(new anchor.BN(tokenAAmount), new anchor.BN(tokenBAmount))
+        .accounts(depositAccounts)
+        .signers([poolOwner])
+        .rpc();
+
+      console.log(`Liquidity deposited. Transaction ID: ${depositTxId}`);
+
+      // Check pool balances after deposit
+      const poolAfterDeposit = await program.account.liquidityPool.fetch(poolPda);
+      const poolTokenAAccountAfterDeposit = await provider.connection.getTokenAccountBalance(poolTokenA);
+      const poolTokenBAccountAfterDeposit = await provider.connection.getTokenAccountBalance(poolTokenB);
+      const ownerLpTokenAccountAfterDeposit = await provider.connection.getTokenAccountBalance(ownerLpToken);
+
+      console.log("Pool token A balance after deposit:", poolTokenAAccountAfterDeposit.value.amount);
+      console.log("Pool token B balance after deposit:", poolTokenBAccountAfterDeposit.value.amount);
+      console.log("Owner LP tokens after deposit:", ownerLpTokenAccountAfterDeposit.value.amount);
+      console.log("Pool total liquidity after deposit:", poolAfterDeposit.totalLiquidity.toString());
+
+      // Now withdraw half of the LP tokens
+      const lpAmountToWithdraw = Math.floor(Number(ownerLpTokenAccountAfterDeposit.value.amount) / 2);
+
+      const withdrawAccounts = {
+        owner: poolOwner.publicKey,
+        pool: poolPda,
+        tokenAMint: tokenAMint,
+        tokenBMint: tokenBMint,
+        poolTokenA: poolTokenA,
+        poolTokenB: poolTokenB,
+        lpTokenMint: lpTokenMint,
+        userTokenA: ownerTokenA,
+        userTokenB: ownerTokenB,
+        userLpToken: ownerLpToken,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+      };
+
+      const withdrawTxId = await program.methods
+        .withdrawLiquidity(new anchor.BN(lpAmountToWithdraw))
+        .accounts(withdrawAccounts)
+        .signers([poolOwner])
+        .rpc();
+
+      console.log(`Liquidity withdrawn. Transaction ID: ${withdrawTxId}`);
+
+      // Check balances after withdrawal
+      const poolAfterWithdraw = await program.account.liquidityPool.fetch(poolPda);
+      const poolTokenAAccountAfterWithdraw = await provider.connection.getTokenAccountBalance(poolTokenA);
+      const poolTokenBAccountAfterWithdraw = await provider.connection.getTokenAccountBalance(poolTokenB);
+      const ownerTokenAAccountAfterWithdraw = await provider.connection.getTokenAccountBalance(ownerTokenA);
+      const ownerTokenBAccountAfterWithdraw = await provider.connection.getTokenAccountBalance(ownerTokenB);
+      const ownerLpTokenAccountAfterWithdraw = await provider.connection.getTokenAccountBalance(ownerLpToken);
+
+      console.log("Pool token A balance after withdrawal:", poolTokenAAccountAfterWithdraw.value.amount);
+      console.log("Pool token B balance after withdrawal:", poolTokenBAccountAfterWithdraw.value.amount);
+      console.log("Owner token A balance after withdrawal:", ownerTokenAAccountAfterWithdraw.value.amount);
+      console.log("Owner token B balance after withdrawal:", ownerTokenBAccountAfterWithdraw.value.amount);
+      console.log("Owner LP tokens after withdrawal:", ownerLpTokenAccountAfterWithdraw.value.amount);
+      console.log("Pool total liquidity after withdrawal:", poolAfterWithdraw.totalLiquidity.toString());
+
+      // Verify pool state after withdrawal
+      expect(Number(poolAfterWithdraw.totalLiquidity.toString())).to.be.approximately(
+        Number(poolAfterDeposit.totalLiquidity.toString()) - lpAmountToWithdraw,
+        1 // Allow for rounding differences
+      );
+
+      // Verify LP tokens were burned
+      expect(Number(ownerLpTokenAccountAfterWithdraw.value.amount)).to.be.approximately(
+        Number(ownerLpTokenAccountAfterDeposit.value.amount) - lpAmountToWithdraw,
+        1 // Allow for rounding differences
+      );
+
+      // Verify tokens were returned proportionally
+      expect(Number(poolTokenAAccountAfterWithdraw.value.amount)).to.be.approximately(
+        Number(poolTokenAAccountAfterDeposit.value.amount) / 2,
+        10 // Allow for rounding differences
+      );
+
+      expect(Number(poolTokenBAccountAfterWithdraw.value.amount)).to.be.approximately(
+        Number(poolTokenBAccountAfterDeposit.value.amount) / 2,
+        10 // Allow for rounding differences
+      );
+
+      console.log("Withdrawal test passed with all validations");
+    } catch (error) {
+      console.error("Error in withdrawal test:", error);
       throw error;
     }
   });
