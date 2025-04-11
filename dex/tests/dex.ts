@@ -174,7 +174,7 @@ describe("DEX tests", () => {
       console.log(`Created Token A mint: ${tokenAMint.toBase58()}`);
       console.log(`Created Token B mint: ${tokenBMint.toBase58()}`);
 
-      // Find the pool PDA address
+      // Find the pool PDA address. This is important to understand that pool PDA is derived from 2 token mints.
       const [poolPda, poolBump] = PublicKey.findProgramAddressSync(
         [
           Buffer.from("liquidity_pool"),

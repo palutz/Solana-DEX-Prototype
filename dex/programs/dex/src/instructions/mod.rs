@@ -310,7 +310,6 @@ pub struct CreatePool<'info> {
     // - The pool itself has control over this account
     #[account(
         mut,
-        // payer = owner,
         token::mint = token_a_mint,
         token::authority = pool,
     )]
@@ -319,8 +318,6 @@ pub struct CreatePool<'info> {
     // Create a token account to hold the pool's reserves of Token B
     // - The pool itself has control over this account
     #[account(
-        // init_if_needed,
-        // payer = owner,
         mut,
         token::mint = token_b_mint,
         token::authority = pool,
