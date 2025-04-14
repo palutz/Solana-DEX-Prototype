@@ -81,14 +81,12 @@ solana airdrop 100 <wallet_address> -ul
 - [x] Implement pool initialization logic
 - [x] Develop liquidity provision/withdrawal functions
 - [x] Write tests for these functions
-- [ ] Start building simple client integration
+- [x] Start building simple client integration
 
 ## Week 3: Swap Functionality & Testing
 
 - [x] Implement swap function with constant product formula
 - [ ] Add fee calculation and distribution
-- [ ] Complete end-to-end testing on Solana devnet
-- [ ] Refine error handling and input validation
 
 ## Week 4: (Frontend & Integration)
 
@@ -104,6 +102,7 @@ solana airdrop 100 <wallet_address> -ul
 - Dex initialization with correct Admin Key
 - Creating a liquidity pool
 - Depositing and withdrawing liquidity
+- Swapping tokens
 
 # Frontend Deployment
 

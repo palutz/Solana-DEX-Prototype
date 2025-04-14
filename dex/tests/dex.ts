@@ -61,6 +61,7 @@ describe("DEX tests", () => {
     await airdropIfNeeded(provider.connection, poolOwner.publicKey);
   });
 
+  // NOTE: Dex initialization with incorrect Admin Key is failing
   it("Dex initialization with incorrect Admin Key is failing", async () => {
     // Get PDA for unauthorized admin
     const unauthorizedDexStatePda = PublicKey.findProgramAddressSync(
@@ -88,6 +89,7 @@ describe("DEX tests", () => {
     }
   });
 
+  // NOTE: Dex initialization with correct Admin Key
   it("Dex initialization with correct Admin Key", async () => {
     const initializeAccounts = {
       admin: adminWallet.publicKey,
@@ -109,6 +111,7 @@ describe("DEX tests", () => {
     expect(dexState.feeDenominator.toNumber()).to.equal(1000);
   });
 
+  // NOTE: Creating a liquidity pool
   it("Creating a liquidity pool", async () => {
     // Create token mints
     tokenAMintKeypair = Keypair.generate();
@@ -244,6 +247,7 @@ describe("DEX tests", () => {
     expect(lpMintInfo.decimals).to.equal(6);
   });
 
+  // NOTE: Depositing and withdrawing liquidity
   it("Depositing and withdrawing liquidity", async () => {
     // Create user token accounts
     const ownerTokenA = getAssociatedTokenAddressSync(
@@ -402,6 +406,7 @@ describe("DEX tests", () => {
     );
   });
 
+  // NOTE: Swapping tokens
   it("Swapping tokens", async () => {
     // Get token accounts
     const ownerTokenA = getAssociatedTokenAddressSync(
