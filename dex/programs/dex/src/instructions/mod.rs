@@ -1,18 +1,19 @@
 mod deposit;
+mod swap;
 mod withdrawal;
-use deposit::*;
-use withdrawal::*;
-
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
+use deposit::*;
+use swap::*;
+use withdrawal::*;
 
 use crate::DexError;
 
 // NOTE: Functions
-/* 
+/*
  * Sets up the DEX global state with admin access and fee configuration
  * Only the designated admin can call this function
  */
@@ -44,33 +45,36 @@ pub fn initialize_dex(
 pub fn create_liquidity_pool(ctx: Context<CreatePool>) -> Result<()> {
     let pool = &mut ctx.accounts.pool;
     let dex_state = &mut ctx.accounts.dex_state;
-    
+
     // Initialize pool data
     pool.token_a_mint = ctx.accounts.token_a_mint.key();
     pool.token_b_mint = ctx.accounts.token_b_mint.key();
     pool.token_a_account = ctx.accounts.pool_token_a.key();
     pool.token_b_account = ctx.accounts.pool_token_b.key();
     pool.lp_token_mint = ctx.accounts.lp_token_mint.key();
-    
+
     // Save the PDA bump for future references
     pool.bump = ctx.bumps.pool;
-    
+
     // Initialize liquidity
     pool.total_liquidity = 0;
-    
+
     // Copy fee settings from DEX state
     pool.fee_numerator = dex_state.fee_numerator;
     pool.fee_denominator = dex_state.fee_denominator;
-    
+
     // Increment the pools counter in DEX state
     dex_state.pools_count += 1;
-    
+
     msg!("Pool created: {}", pool.key());
     msg!("Token A Mint: {}", pool.token_a_mint);
     msg!("Token B Mint: {}", pool.token_b_mint);
     msg!("LP Token Mint: {}", pool.lp_token_mint);
-    msg!("Owner LP Token Account: {}", ctx.accounts.owner_lp_token.key());
-    
+    msg!(
+        "Owner LP Token Account: {}",
+        ctx.accounts.owner_lp_token.key()
+    );
+
     Ok(())
 }
 
@@ -78,7 +82,11 @@ pub fn create_liquidity_pool(ctx: Context<CreatePool>) -> Result<()> {
  * Adds liquidity to a pool and mints LP tokens
  * The first deposit sets the initial price ratio
  */
-pub fn perform_liquidity_deposit(ctx: Context<DepositLiquidity>, token_a_amount: u64, token_b_amount: u64) -> Result<()> {
+pub fn perform_liquidity_deposit(
+    ctx: Context<DepositLiquidity>,
+    token_a_amount: u64,
+    token_b_amount: u64,
+) -> Result<()> {
     // Get references to all accounts
     let pool = &mut ctx.accounts.pool;
     let pool_token_a = &mut ctx.accounts.pool_token_a;
@@ -103,14 +111,14 @@ pub fn perform_liquidity_deposit(ctx: Context<DepositLiquidity>, token_a_amount:
     } else {
         // For subsequent deposits, calculate proportionally
         calculate_proportional_liquidity(
-            token_a_amount, 
+            token_a_amount,
             token_b_amount,
             reserve_a,
             reserve_b,
-            pool.total_liquidity
+            pool.total_liquidity,
         )?
     };
-    
+
     // Transfer both tokens from user to pool
     // Token A
     transfer_user_tokens_to_pool(
@@ -119,9 +127,9 @@ pub fn perform_liquidity_deposit(ctx: Context<DepositLiquidity>, token_a_amount:
         user_token_a,
         pool_token_a,
         owner,
-        token_a_amount
+        token_a_amount,
     )?;
-    
+
     // Token B
     transfer_user_tokens_to_pool(
         token_b_mint,
@@ -129,29 +137,31 @@ pub fn perform_liquidity_deposit(ctx: Context<DepositLiquidity>, token_a_amount:
         user_token_b,
         pool_token_b,
         owner,
-        token_b_amount
+        token_b_amount,
     )?;
-    
+
     // Mint LP tokens to user
     mint_lp_tokens_to_user(
         token_program,
         lp_token_mint,
         user_lp_token,
         pool,
-        lp_tokens_to_mint
+        lp_tokens_to_mint,
     )?;
-    
+
     // Update pool total liquidity
-    pool.total_liquidity = pool.total_liquidity.checked_add(lp_tokens_to_mint)
+    pool.total_liquidity = pool
+        .total_liquidity
+        .checked_add(lp_tokens_to_mint)
         .ok_or(error!(DexError::InsufficientLiquidity))?;
-    
+
     msg!(
         "Deposited {} token A and {} token B for {} LP tokens",
         token_a_amount,
         token_b_amount,
         lp_tokens_to_mint
     );
-    
+
     Ok(())
 }
 
@@ -176,13 +186,13 @@ pub fn perform_liquidity_withdrawal(ctx: Context<WithdrawLiquidity>, lp_amount: 
     // Get current pool reserves
     let reserve_a = pool_token_a.amount;
     let reserve_b = pool_token_b.amount;
-    
+
     // Ensure user has enough LP tokens
     require!(
         user_lp_token.amount >= lp_amount,
         DexError::InsufficientLiquidity
     );
-    
+
     // Ensure pool has enough total liquidity
     require!(
         pool.total_liquidity >= lp_amount,
@@ -190,22 +200,18 @@ pub fn perform_liquidity_withdrawal(ctx: Context<WithdrawLiquidity>, lp_amount: 
     );
 
     // Calculate token amounts to withdraw based on user's share
-    let (token_a_amount, token_b_amount) = calculate_withdrawal_amounts(
-        lp_amount,
-        reserve_a,
-        reserve_b,
-        pool.total_liquidity
-    )?;
-    
+    let (token_a_amount, token_b_amount) =
+        calculate_withdrawal_amounts(lp_amount, reserve_a, reserve_b, pool.total_liquidity)?;
+
     // Burn user's LP tokens
     burn_lp_tokens(
         token_program,
         lp_token_mint,
         user_lp_token,
         owner,
-        lp_amount
+        lp_amount,
     )?;
-    
+
     // Transfer tokens from pool to user
     // Token A
     transfer_pool_tokens_to_user(
@@ -214,9 +220,9 @@ pub fn perform_liquidity_withdrawal(ctx: Context<WithdrawLiquidity>, lp_amount: 
         pool_token_a,
         user_token_a,
         pool,
-        token_a_amount
+        token_a_amount,
     )?;
-    
+
     // Token B
     transfer_pool_tokens_to_user(
         token_b_mint,
@@ -224,29 +230,100 @@ pub fn perform_liquidity_withdrawal(ctx: Context<WithdrawLiquidity>, lp_amount: 
         pool_token_b,
         user_token_b,
         pool,
-        token_b_amount
+        token_b_amount,
     )?;
-    
+
     // Update pool total liquidity
-    pool.total_liquidity = pool.total_liquidity.checked_sub(lp_amount)
+    pool.total_liquidity = pool
+        .total_liquidity
+        .checked_sub(lp_amount)
         .ok_or(error!(DexError::InsufficientLiquidity))?;
-    
+
     msg!(
         "Withdrawn {} token A and {} token B by burning {} LP tokens",
         token_a_amount,
         token_b_amount,
         lp_amount
     );
-    
+
     Ok(())
 }
 
 /*
  * Swaps one token for another using the constant product formula
- * Not yet implemented
  */
-pub fn swap_tokens(ctx: Context<Swap>) -> Result<()> {
-    todo!();
+pub fn swap_tokens(
+    ctx: Context<Swap>,
+    input_amount: u64,
+    minimum_output_amount: u64,
+) -> Result<()> {
+    // Get references to all accounts
+    let pool = &ctx.accounts.pool;
+    let source_mint = &ctx.accounts.source_mint;
+    let destination_mint = &ctx.accounts.destination_mint;
+    let user_source_token = &ctx.accounts.user_source_token;
+    let user_destination_token = &ctx.accounts.user_destination_token;
+    let owner = &ctx.accounts.owner;
+    let token_program = &ctx.accounts.token_program;
+
+    // Determine which token is being swapped in/out
+    let is_source_token_a = is_token_a(pool, &source_mint.key());
+
+    // Get pool token accounts based on source/destination
+    let (pool_source_token, pool_destination_token) = if is_source_token_a {
+        (&ctx.accounts.pool_token_a, &ctx.accounts.pool_token_b)
+    } else {
+        (&ctx.accounts.pool_token_b, &ctx.accounts.pool_token_a)
+    };
+
+    // Get current reserves
+    let source_reserve = pool_source_token.amount;
+    let destination_reserve = pool_destination_token.amount;
+
+    // Calculate output amount using constant product formula with fees
+    let output_amount = calculate_output_amount(
+        input_amount,
+        source_reserve,
+        destination_reserve,
+        pool.fee_numerator,
+        pool.fee_denominator,
+    )?;
+
+    // Check slippage tolerance
+    require!(
+        output_amount >= minimum_output_amount,
+        DexError::SlippageExceeded
+    );
+
+    // Perform the swap:
+    // 1. Transfer source tokens from user to pool
+    transfer_source_tokens_to_pool(
+        source_mint,
+        token_program,
+        user_source_token,
+        pool_source_token,
+        owner,
+        input_amount,
+    )?;
+
+    // 2. Transfer destination tokens from pool to user
+    transfer_destination_tokens_to_user(
+        destination_mint,
+        token_program,
+        pool_destination_token,
+        user_destination_token,
+        pool,
+        output_amount,
+    )?;
+
+    // Log swap details
+    msg!(
+        "Swapped {} tokens for {} tokens",
+        input_amount,
+        output_amount
+    );
+
+    Ok(())
 }
 
 // NOTE: Types
@@ -272,27 +349,27 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// This struct defines all the accounts needed to create a new trading pool
+/// This struct defines all the accounts needed to create a new trading pool
 #[derive(Accounts)]
 pub struct CreatePool<'info> {
     // The person creating the pool - needs to be mutable because they'll pay for account creation
     #[account(mut)]
     pub owner: Signer<'info>,
-    
+
     // The main DEX configuration - mutable because we'll update the pools counter
     #[account(mut)]
     pub dex_state: Account<'info, DexState>,
-    
+
     // The two token definitions for this trading pair
     pub token_a_mint: InterfaceAccount<'info, Mint>,
     pub token_b_mint: InterfaceAccount<'info, Mint>,
-    
+
     // The pool account that stores all information about this trading pair
     // - init: Create a new account
     // - payer = owner: The creator pays for account creation
     // - space: Allocate enough storage for the account data
-    // - seeds: Generate a deterministic address from these values
-    //   (ensures unique address for this token pair)
+    // - seeds: Generate a deterministic address from these values (ensures unique address for this
+    //   token pair)
     #[account(
         init,
         payer = owner,
@@ -345,7 +422,7 @@ pub struct CreatePool<'info> {
         associated_token::authority = owner,
     )]
     pub owner_lp_token: InterfaceAccount<'info, TokenAccount>,
-    
+
     // Required Solana programs for handling tokens and accounts
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -397,7 +474,7 @@ impl LiquidityPool {
 
 #[derive(Accounts)]
 pub struct DepositLiquidity<'info> {
-    // Liquidity provider 
+    // Liquidity provider
     #[account(mut)]
     pub owner: Signer<'info>,
 
@@ -546,14 +623,14 @@ pub struct Swap<'info> {
     // Pool that contains the trading pair
     #[account(mut)]
     pub pool: Account<'info, LiquidityPool>,
-    
+
     // Token the user is swapping from
     pub source_mint: InterfaceAccount<'info, Mint>,
-    
+
     // Token the user is swapping to
     pub destination_mint: InterfaceAccount<'info, Mint>,
 
-    // Pool's token A account 
+    // Pool's token A account
     // Verifies account matches pool record and is part of the swap
     #[account(
         mut,

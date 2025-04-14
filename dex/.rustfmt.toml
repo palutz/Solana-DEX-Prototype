@@ -6,6 +6,11 @@
 #    ],
 # --------------------------------------------------
 
+tab_spaces = 4
+max_width = 100
+reorder_imports = true
+
+# unstable
 unstable_features = true
 group_imports = "StdExternalCrate"
 imports_granularity = "Crate"

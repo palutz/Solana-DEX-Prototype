@@ -21,11 +21,7 @@ pub(crate) fn transfer_user_tokens_to_pool<'info>(
 
     let cpi_ctx = CpiContext::new(token_program.to_account_info(), cpi_accounts);
 
-    anchor_spl::token_interface::transfer_checked(
-        cpi_ctx,
-        amount,
-        mint.decimals
-    )
+    anchor_spl::token_interface::transfer_checked(cpi_ctx, amount, mint.decimals)
 }
 
 /// Mints LP tokens to the user

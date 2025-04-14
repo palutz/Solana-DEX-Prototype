@@ -1,5 +1,15 @@
 #![allow(unexpected_cfgs)]
 
+#[allow(unused_imports)]
+use solana_security_txt::security_txt;
+#[cfg(not(feature = "no-entrypoint"))]
+security_txt! {
+    name: "GR5-Dex",
+    project_url: "http://example.com",
+    contacts: "email:nickshv13@icloud.com",
+    policy: "https://github.com/anza-xyz/agave/blob/master/SECURITY.mdhttps://github.com/anza-xyz/agave/blob/master/SECURITY.md"
+}
+
 use anchor_lang::prelude::*;
 
 pub mod instructions;
@@ -71,8 +81,8 @@ pub mod dex {
         instructions::create_liquidity_pool(ctx)
     }
 
-    // Adds liquidity to an existing pool
-    // Deposits specified amounts of both tokens and mints LP tokens in return
+    /// Adds liquidity to an existing pool
+    /// Deposits specified amounts of both tokens and mints LP tokens in return
     // ┌────────┐     ┌───────────────┐     ┌───────────────┐
     // │  User  │────►│ User's TokenA │────►│ Pool's TokenA │
     // └────────┘     │ User's TokenB │     │   Reserve     │
@@ -80,16 +90,16 @@ pub mod dex {
     //                                              │
     //                                              ▼
     //                                      ┌────────────────┐
-    //                               yes────│ First Deposit? ├──────no
+    //                               yes────│ First Deposit? ├─────no
     //                                │     └────────────────┘      │
     //                                ▼                             ▼
     //                        ┌───────────────┐            ┌─────────────────┐
     //                        │ Calculate LP: │            │ Calculate LP:   │
     //                        │ sqrt(TokenA * │            │ Proportional to │
     //                        │ TokenB)       │            │ Existing Ratio  │
-    //                        └───────┬───────┘            └───────┬─────────┘
-    //                                │                            │
-    //                                └─────────────┬──────────────┘
+    //                        └───────┬───────┘            └────────┬────────┘
+    //                                │                             │
+    //                                └─────────────┬───────────────┘
     //                                              │
     //                                              ▼
     //                                      ┌────────────────┐     ┌───────────┐
@@ -109,8 +119,8 @@ pub mod dex {
         instructions::perform_liquidity_deposit(ctx, token_a_amount, token_b_amount)
     }
 
-    // Removes liquidity from a pool by burning LP tokens
-    // Returns both tokens to the user proportional to their share
+    /// Removes liquidity from a pool by burning LP tokens
+    /// Returns both tokens to the user proportional to their share
     // ┌────────┐     ┌─────────────┐     ┌───────────────┐     ┌───────────────────┐
     // │  User  │────►│ Provide LP  │────►│  Verify User  │────►│  Verify Pool Has  │
     // └────────┘     │   Tokens    │     │ Has Enough LP │     │ Sufficient Tokens │
@@ -123,22 +133,22 @@ pub mod dex {
     //     └────────┬─────────┘     │  circulation)   │     └────────────┬────────────┘
     //              │               └─────────────────┘                  │
     //              │                                                    ▼
-    //              │                                          ┌──────────────────┐ 
-    //              │                                          │ Calculate Share: │ 
-    //              │                                          │  TokenB Amount   │ 
-    //              │                                          └────────┬─────────┘ 
-    //              │                                                   │          
-    //              │                                                   ▼          
-    //              ▼                                           ┌─────────────────┐   
-    //     ┌─────────────────┐                                  │ Transfer TokenB │   
-    //     │ Transfer TokenA │                                  │     to User     │   
-    //     │     to User     │                                  └────────┬────────┘   
-    //     └───────┬─────────┘                                           │             
-    //             │                                                     ▼             
-    //             ▼                                            ┌─────────────────┐    
-    //     ┌─────────────────┐                                  │ Decrease TokenB │    
-    //     │ Decrease TokenA │                                  │     Reserve     │    
-    //     │     Reserve     │                                  └────────┬────────┘    
+    //              │                                          ┌──────────────────┐
+    //              │                                          │ Calculate Share: │
+    //              │                                          │  TokenB Amount   │
+    //              │                                          └─────────┬────────┘
+    //              │                                                    │
+    //              │                                                    ▼
+    //              ▼                                           ┌─────────────────┐
+    //     ┌─────────────────┐                                  │ Transfer TokenB │
+    //     │ Transfer TokenA │                                  │     to User     │
+    //     │     to User     │                                  └────────┬────────┘
+    //     └───────┬─────────┘                                           │
+    //             │                                                     ▼
+    //             ▼                                            ┌─────────────────┐
+    //     ┌─────────────────┐                                  │ Decrease TokenB │
+    //     │ Decrease TokenA │                                  │     Reserve     │
+    //     │     Reserve     │                                  └────────┬────────┘
     //     └───────┬─────────┘                                           │
     //             │                                                     │
     //             └─────────────────────────┬───────────────────────────┘
@@ -152,10 +162,32 @@ pub mod dex {
         instructions::perform_liquidity_withdrawal(ctx, lp_amount)
     }
 
-    // Swaps between the two tokens in a pool
-    // Uses constant product formula (x*y=k) to determine exchange rate
-    pub fn swap(ctx: Context<Swap>) -> Result<()> {
-        instructions::swap_tokens(ctx)
+    /// Swaps between the two tokens in a pool
+    /// Uses constant product formula (x*y=k) to determine exchange rate
+    // ┌────────┐     ┌────────────┐     ┌───────────────┐     ┌──────────────────┐
+    // │  User  │────►│ User Token │────►│ Verify Pool   │────►│ Calculate Output │
+    // └────────┘     │    A/B     │     │ Has Liquidity │     │ Amount (x*y=k)   │
+    //                └────────────┘     └──────┬────────┘     └────────┬─────────┘
+    //                                          │                       │
+    //                                          ▼                       ▼
+    // ┌────────────────┐              ┌─────────────────┐     ┌─────────────────┐
+    // │ User Receives  │◄─────────────┤ Apply Fee to    │◄────┤ Check Slippage  │
+    // │ Output Tokens  │              │  Input Amount   │     │ Tolerance       │
+    // └────────────────┘              └─────────────────┘     └─────────────────┘
+    //                                           │
+    //                                           ▼
+    //                                ┌──────────────────────┐
+    //                                │ Transfer Input Token │
+    //                                │ From User to Pool    │
+    //                                └──────────┬───────────┘
+    //                                           │
+    //                                           ▼
+    //                                ┌──────────────────────┐
+    //                                │ Transfer Output Token│
+    //                                │ From Pool to User    │
+    //                                └──────────────────────┘
+    pub fn swap(ctx: Context<Swap>, input_amount: u64, minimum_output_amount: u64) -> Result<()> {
+        instructions::swap_tokens(ctx, input_amount, minimum_output_amount)
     }
 }
 
@@ -171,4 +203,7 @@ pub enum DexError {
     // Triggered when liquidity is insufficient for an operation
     #[msg("Insufficient liquidity.")]
     InsufficientLiquidity,
+    // Triggered when slippage tolerance is exceeded during a swap
+    #[msg("Slippage tolerance exceeded.")]
+    SlippageExceeded,
 }

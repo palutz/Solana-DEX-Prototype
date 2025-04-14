@@ -85,7 +85,7 @@ solana airdrop 100 <wallet_address> -ul
 
 ## Week 3: Swap Functionality & Testing
 
-- [ ] Implement swap function with constant product formula
+- [x] Implement swap function with constant product formula
 - [ ] Add fee calculation and distribution
 - [ ] Complete end-to-end testing on Solana devnet
 - [ ] Refine error handling and input validation

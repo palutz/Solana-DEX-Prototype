@@ -542,6 +542,338 @@ describe("DEX tests", () => {
       throw error;
     }
   });
+
+  // NOTE: Test case 5
+  it("Swapping tokens", async () => {
+    try {
+      // First, create a pool with liquidity if not already created
+      // We'll reuse the pool and token accounts from previous tests
+
+      // Calculate the token accounts
+      const ownerTokenA = getAssociatedTokenAddressSync(
+        tokenAMint,
+        poolOwner.publicKey,
+        false,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_PROGRAM_ID
+      );
+
+      const ownerTokenB = getAssociatedTokenAddressSync(
+        tokenBMint,
+        poolOwner.publicKey,
+        false,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_PROGRAM_ID
+      );
+
+      // Calculate LP token account
+      const [poolPda] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("liquidity_pool"),
+          tokenAMint.toBuffer(),
+          tokenBMint.toBuffer(),
+        ],
+        program.programId
+      );
+
+      // Calculate the pool accounts
+      const poolTokenA = getAssociatedTokenAddressSync(
+        tokenAMint,
+        poolPda,
+        true,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_PROGRAM_ID
+      );
+
+      const poolTokenB = getAssociatedTokenAddressSync(
+        tokenBMint,
+        poolPda,
+        true,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_PROGRAM_ID
+      );
+
+      // Ensure the pool has enough liquidity
+      // We'll deposit additional liquidity if needed
+      const poolTokenAAccountInfo = await provider.connection.getTokenAccountBalance(poolTokenA);
+      const poolTokenBAccountInfo = await provider.connection.getTokenAccountBalance(poolTokenB);
+
+      // If pool has low liquidity, add more
+      if (
+        Number(poolTokenAAccountInfo.value.amount) < 100000 ||
+        Number(poolTokenBAccountInfo.value.amount) < 100000
+      ) {
+        console.log("Adding additional liquidity to pool for swap test");
+
+        // Mint some more tokens to the pool owner if needed
+        const userTokenABalance = await provider.connection.getTokenAccountBalance(ownerTokenA);
+        const userTokenBBalance = await provider.connection.getTokenAccountBalance(ownerTokenB);
+
+        const mintTxs = new Transaction();
+
+        // Add mint instructions if needed
+        if (Number(userTokenABalance.value.amount) < 500000) {
+          const mintAIx = createMintToInstruction(
+            tokenAMint,             // mint
+            ownerTokenA,            // destination
+            poolOwner.publicKey,    // authority
+            500000,                 // amount (0.5 token with 6 decimals)
+            [],                     // multiSigners (empty array if not using multisig)
+            TOKEN_2022_PROGRAM_ID   // programId
+          );
+          mintTxs.add(mintAIx);
+        }
+
+        if (Number(userTokenBBalance.value.amount) < 500000) {
+          const mintBIx = createMintToInstruction(
+            tokenBMint,             // mint
+            ownerTokenB,            // destination
+            poolOwner.publicKey,    // authority
+            500000,                 // amount (0.5 token with 6 decimals)
+            [],                     // multiSigners (empty array if not using multisig)
+            TOKEN_2022_PROGRAM_ID   // programId
+          );
+          mintTxs.add(mintBIx);
+        }
+
+        // Execute mint transactions if needed
+        if (mintTxs.instructions.length > 0) {
+          const mintTxId = await provider.sendAndConfirm(mintTxs, [poolOwner]);
+          console.log(`Additional tokens minted. Transaction ID: ${mintTxId}`);
+        }
+
+        // Define deposit accounts
+        const depositAccounts = {
+          owner: poolOwner.publicKey,
+          pool: poolPda,
+          tokenAMint: tokenAMint,
+          tokenBMint: tokenBMint,
+          poolTokenA: poolTokenA,
+          poolTokenB: poolTokenB,
+          lpTokenMint: (await program.account.liquidityPool.fetch(poolPda)).lpTokenMint,
+          userTokenA: ownerTokenA,
+          userTokenB: ownerTokenB,
+          userLpToken: getAssociatedTokenAddressSync(
+            (await program.account.liquidityPool.fetch(poolPda)).lpTokenMint,
+            poolOwner.publicKey,
+            false,
+            TOKEN_2022_PROGRAM_ID,
+            ASSOCIATED_PROGRAM_ID
+          ),
+          tokenProgram: TOKEN_2022_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        };
+
+        // Deposit liquidity
+        const tokenAAmount = 200000; // 0.2 tokens
+        const tokenBAmount = 400000; // 0.4 tokens
+
+        const depositTxId = await program.methods
+          .depositLiquidity(new anchor.BN(tokenAAmount), new anchor.BN(tokenBAmount))
+          .accounts(depositAccounts)
+          .signers([poolOwner])
+          .rpc();
+
+        console.log(`Additional liquidity deposited. Transaction ID: ${depositTxId}`);
+      }
+
+      // Get pool data before swap
+      const poolBeforeSwap = await program.account.liquidityPool.fetch(poolPda);
+      const poolTokenABalanceBefore = await provider.connection.getTokenAccountBalance(poolTokenA);
+      const poolTokenBBalanceBefore = await provider.connection.getTokenAccountBalance(poolTokenB);
+      const ownerTokenABalanceBefore = await provider.connection.getTokenAccountBalance(ownerTokenA);
+      const ownerTokenBBalanceBefore = await provider.connection.getTokenAccountBalance(ownerTokenB);
+
+      console.log("--- Pool State Before Swap ---");
+      console.log("Pool token A balance:", poolTokenABalanceBefore.value.amount);
+      console.log("Pool token B balance:", poolTokenBBalanceBefore.value.amount);
+      console.log("User token A balance:", ownerTokenABalanceBefore.value.amount);
+      console.log("User token B balance:", ownerTokenBBalanceBefore.value.amount);
+
+      // Now perform a swap from token A to token B
+      // Prepare the swap accounts
+      const swapAccounts = {
+        owner: poolOwner.publicKey,
+        pool: poolPda,
+        sourceMint: tokenAMint,
+        destinationMint: tokenBMint,
+        poolTokenA: poolTokenA,
+        poolTokenB: poolTokenB,
+        userSourceToken: ownerTokenA,
+        userDestinationToken: ownerTokenB,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+      };
+
+      // Calculate expected output using constant product formula
+      // (Simple calculation to estimate the output without fees)
+      const inputAmount = 50000; // 0.05 token A
+      const reserveA = Number(poolTokenABalanceBefore.value.amount);
+      const reserveB = Number(poolTokenBBalanceBefore.value.amount);
+      const feeNumerator = poolBeforeSwap.feeNumerator.toNumber();
+      const feeDenominator = poolBeforeSwap.feeDenominator.toNumber();
+
+      // Apply fee
+      const inputWithFee = inputAmount - (inputAmount * feeNumerator / feeDenominator);
+
+      // Calculate expected output (approximate)
+      const expectedOutput = Math.floor((reserveB * inputWithFee) / (reserveA + inputWithFee));
+
+      // Set minimum output with 1% slippage tolerance
+      const minimumOutputAmount = Math.floor(expectedOutput * 0.99);
+
+      console.log(`Expected output for ${inputAmount} token A: ~${expectedOutput} token B`);
+      console.log(`Minimum output with slippage: ${minimumOutputAmount} token B`);
+
+      // Execute the swap
+      const swapTxId = await program.methods
+        .swap(
+          new anchor.BN(inputAmount),
+          new anchor.BN(minimumOutputAmount)
+        )
+        .accounts(swapAccounts)
+        .signers([poolOwner])
+        .rpc();
+
+      console.log(`Swap executed. Transaction ID: ${swapTxId}`);
+
+      // Get pool data after swap
+      const poolAfterSwap = await program.account.liquidityPool.fetch(poolPda);
+      const poolTokenABalanceAfter = await provider.connection.getTokenAccountBalance(poolTokenA);
+      const poolTokenBBalanceAfter = await provider.connection.getTokenAccountBalance(poolTokenB);
+      const ownerTokenABalanceAfter = await provider.connection.getTokenAccountBalance(ownerTokenA);
+      const ownerTokenBBalanceAfter = await provider.connection.getTokenAccountBalance(ownerTokenB);
+
+      console.log("--- Pool State After Swap ---");
+      console.log("Pool token A balance:", poolTokenABalanceAfter.value.amount);
+      console.log("Pool token B balance:", poolTokenBBalanceAfter.value.amount);
+      console.log("User token A balance:", ownerTokenABalanceAfter.value.amount);
+      console.log("User token B balance:", ownerTokenBBalanceAfter.value.amount);
+
+      // Verify pool token A increased by input amount
+      expect(
+        Number(poolTokenABalanceAfter.value.amount) - Number(poolTokenABalanceBefore.value.amount)
+      ).to.equal(inputAmount);
+
+      // Verify pool token B decreased by output amount
+      const actualOutputAmount = Number(ownerTokenBBalanceAfter.value.amount) - Number(ownerTokenBBalanceBefore.value.amount);
+      expect(
+        Number(poolTokenBBalanceBefore.value.amount) - Number(poolTokenBBalanceAfter.value.amount)
+      ).to.equal(actualOutputAmount);
+
+      // Verify user token A decreased by input amount
+      expect(
+        Number(ownerTokenABalanceBefore.value.amount) - Number(ownerTokenABalanceAfter.value.amount)
+      ).to.equal(inputAmount);
+
+      // Verify actual output is at least the minimum expected
+      expect(actualOutputAmount).to.be.at.least(minimumOutputAmount);
+
+      // Verify the constant product formula approximately holds (with some tolerance for rounding)
+      const productBefore = Number(poolTokenABalanceBefore.value.amount) * Number(poolTokenBBalanceBefore.value.amount);
+      const productAfter = Number(poolTokenABalanceAfter.value.amount) * Number(poolTokenBBalanceAfter.value.amount);
+
+      // The product should increase slightly due to fees
+      expect(productAfter).to.be.greaterThan(productBefore * 0.99);
+
+      console.log("Swap test passed with all validations");
+
+      // Now try the opposite direction: token B to token A
+      console.log("\nTesting swap in opposite direction (B to A)");
+
+      // Get balances before reverse swap
+      const poolTokenABalanceBeforeRev = await provider.connection.getTokenAccountBalance(poolTokenA);
+      const poolTokenBBalanceBeforeRev = await provider.connection.getTokenAccountBalance(poolTokenB);
+      const ownerTokenABalanceBeforeRev = await provider.connection.getTokenAccountBalance(ownerTokenA);
+      const ownerTokenBBalanceBeforeRev = await provider.connection.getTokenAccountBalance(ownerTokenB);
+
+      console.log("--- Pool State Before Reverse Swap ---");
+      console.log("Pool token A balance:", poolTokenABalanceBeforeRev.value.amount);
+      console.log("Pool token B balance:", poolTokenBBalanceBeforeRev.value.amount);
+      console.log("User token A balance:", ownerTokenABalanceBeforeRev.value.amount);
+      console.log("User token B balance:", ownerTokenBBalanceBeforeRev.value.amount);
+
+      // Prepare the reverse swap accounts
+      const reverseSwapAccounts = {
+        owner: poolOwner.publicKey,
+        pool: poolPda,
+        sourceMint: tokenBMint,
+        destinationMint: tokenAMint,
+        poolTokenA: poolTokenA,
+        poolTokenB: poolTokenB,
+        userSourceToken: ownerTokenB,
+        userDestinationToken: ownerTokenA,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+      };
+
+      // Calculate expected output for reverse swap
+      const reverseInputAmount = 30000; // 0.03 token B
+      const reverseReserveA = Number(poolTokenABalanceBeforeRev.value.amount);
+      const reverseReserveB = Number(poolTokenBBalanceBeforeRev.value.amount);
+
+      // Apply fee
+      const reverseInputWithFee = reverseInputAmount - (reverseInputAmount * feeNumerator / feeDenominator);
+
+      // Calculate expected output (approximate)
+      const reverseExpectedOutput = Math.floor((reverseReserveA * reverseInputWithFee) / (reverseReserveB + reverseInputWithFee));
+
+      // Set minimum output with 1% slippage tolerance
+      const reverseMinimumOutputAmount = Math.floor(reverseExpectedOutput * 0.99);
+
+      console.log(`Expected output for ${reverseInputAmount} token B: ~${reverseExpectedOutput} token A`);
+      console.log(`Minimum output with slippage: ${reverseMinimumOutputAmount} token A`);
+
+      // Execute the reverse swap
+      const reverseSwapTxId = await program.methods
+        .swap(
+          new anchor.BN(reverseInputAmount),
+          new anchor.BN(reverseMinimumOutputAmount)
+        )
+        .accounts(reverseSwapAccounts)
+        .signers([poolOwner])
+        .rpc();
+
+      console.log(`Reverse swap executed. Transaction ID: ${reverseSwapTxId}`);
+
+      // Get pool data after reverse swap
+      const poolTokenABalanceAfterRev = await provider.connection.getTokenAccountBalance(poolTokenA);
+      const poolTokenBBalanceAfterRev = await provider.connection.getTokenAccountBalance(poolTokenB);
+      const ownerTokenABalanceAfterRev = await provider.connection.getTokenAccountBalance(ownerTokenA);
+      const ownerTokenBBalanceAfterRev = await provider.connection.getTokenAccountBalance(ownerTokenB);
+
+      console.log("--- Pool State After Reverse Swap ---");
+      console.log("Pool token A balance:", poolTokenABalanceAfterRev.value.amount);
+      console.log("Pool token B balance:", poolTokenBBalanceAfterRev.value.amount);
+      console.log("User token A balance:", ownerTokenABalanceAfterRev.value.amount);
+      console.log("User token B balance:", ownerTokenBBalanceAfterRev.value.amount);
+
+      // Verify pool token B increased by input amount
+      expect(
+        Number(poolTokenBBalanceAfterRev.value.amount) - Number(poolTokenBBalanceBeforeRev.value.amount)
+      ).to.equal(reverseInputAmount);
+
+      // Verify pool token A decreased appropriately
+      const reverseActualOutputAmount = Number(ownerTokenABalanceAfterRev.value.amount) - Number(ownerTokenABalanceBeforeRev.value.amount);
+      expect(
+        Number(poolTokenABalanceBeforeRev.value.amount) - Number(poolTokenABalanceAfterRev.value.amount)
+      ).to.equal(reverseActualOutputAmount);
+
+      // Verify actual output is at least the minimum expected
+      expect(reverseActualOutputAmount).to.be.at.least(reverseMinimumOutputAmount);
+
+      console.log("Reverse swap test passed with all validations");
+    } catch (error) {
+      console.error("Error in swap test:", error);
+      throw error;
+    }
+  });
 });
 
 /**
