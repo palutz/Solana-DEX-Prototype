@@ -1,5 +1,40 @@
 # DEX Project Setup Guide
 
+# NOTE: Roadmap
+
+## Week 1: Environment Setup & Core Program Structure
+
+- [x] Set up Solana development environment
+- [x] Create program skeleton with state and instruction definitions
+- [x] Implement initialization logic
+- [x] Implement basic user token account management
+- [x] Create test framework
+
+## Week 2: Deposit, Withdrawal & Pool Management
+
+- [x] Implement deposit/withdrawal functions
+- [x] Implement pool initialization logic
+- [x] Develop liquidity provision/withdrawal functions
+- [x] Write tests for these functions
+- [x] Start building simple client integration
+
+## Week 3: Swap Functionality & Testing
+
+- [x] Implement swap function with constant product formula
+- [~] Add fee calculation and distribution
+
+## Week 4: (Frontend & Integration)
+
+- [ ] Integrate with basic UI
+
+## Test coverage
+
+- Dex initialization with incorrect Admin Key is failing
+- Dex initialization with correct Admin Key
+- Creating a liquidity pool
+- Depositing and withdrawing liquidity
+- Swapping tokens
+
 ## Installation
 
 1. **Install Rust**
@@ -64,45 +99,6 @@ Each account must be rent-exempt (have minimum SOL balance). To fund accounts on
 ```bash
 solana airdrop 100 <wallet_address> -ul
 ```
-
-# NOTE: Roadmap
-
-## Week 1: Environment Setup & Core Program Structure
-
-- [x] Set up Solana development environment
-- [x] Create program skeleton with state and instruction definitions
-- [x] Implement initialization logic
-- [x] Implement basic user token account management
-- [x] Create test framework
-
-## Week 2: Deposit, Withdrawal & Pool Management
-
-- [x] Implement deposit/withdrawal functions
-- [x] Implement pool initialization logic
-- [x] Develop liquidity provision/withdrawal functions
-- [x] Write tests for these functions
-- [x] Start building simple client integration
-
-## Week 3: Swap Functionality & Testing
-
-- [x] Implement swap function with constant product formula
-- [ ] Add fee calculation and distribution
-
-## Week 4: (Frontend & Integration)
-
-- [ ] Build React frontend with wallet connection
-- [ ] Create swap interface component
-- [ ] Add deposit/withdrawal interface
-- [ ] Integrate client library with frontend
-- [ ] Test complete flow from UI to on-chain program
-
-## Test coverage
-
-- Dex initialization with incorrect Admin Key is failing
-- Dex initialization with correct Admin Key
-- Creating a liquidity pool
-- Depositing and withdrawing liquidity
-- Swapping tokens
 
 # Frontend Deployment
 
