@@ -1,8 +1,8 @@
 # DEX Project Setup Guide
 
-# NOTE: Roadmap
+## NOTE: Roadmap
 
-## Week 1: Environment Setup & Core Program Structure
+### Week 1: Environment Setup & Core Program Structure
 
 - [x] Set up Solana development environment
 - [x] Create program skeleton with state and instruction definitions
@@ -10,7 +10,7 @@
 - [x] Implement basic user token account management
 - [x] Create test framework
 
-## Week 2: Deposit, Withdrawal & Pool Management
+### Week 2: Deposit, Withdrawal & Pool Management
 
 - [x] Implement deposit/withdrawal functions
 - [x] Implement pool initialization logic
@@ -18,16 +18,16 @@
 - [x] Write tests for these functions
 - [x] Start building simple client integration
 
-## Week 3: Swap Functionality & Testing
+### Week 3: Swap Functionality & Testing
 
 - [x] Implement swap function with constant product formula
 - [~] Add fee calculation and distribution
 
-## Week 4: (Frontend & Integration)
+### Week 4: (Frontend & Integration)
 
 - [ ] Integrate with basic UI
 
-## Test coverage
+### Test coverage
 
 - Dex initialization with incorrect Admin Key is failing
 - Dex initialization with correct Admin Key
