@@ -31,10 +31,7 @@ pub fn initialize_dex(
     );
 
     // Check that protocol fee percentage is valid (0-100)
-    require!(
-        protocol_fee_percentage <= 100,
-        DexError::InvalidFees
-    );
+    require!(protocol_fee_percentage <= 100, DexError::InvalidFees);
 
     // Initialize the dex state
     let dex_state = &mut ctx.accounts.dex_state;
@@ -73,7 +70,7 @@ pub fn create_liquidity_pool(ctx: Context<CreatePool>) -> Result<()> {
     pool.fee_numerator = dex_state.fee_numerator;
     pool.fee_denominator = dex_state.fee_denominator;
     pool.protocol_fee_percentage = dex_state.protocol_fee_percentage;
-    
+
     // Initialize protocol fees
     pool.protocol_fees_token_a = 0;
     pool.protocol_fees_token_b = 0;
@@ -305,11 +302,13 @@ pub fn swap_tokens(
 
     // Update accumulated protocol fees
     if is_source_token_a {
-        pool.protocol_fees_token_a = pool.protocol_fees_token_a
+        pool.protocol_fees_token_a = pool
+            .protocol_fees_token_a
             .checked_add(protocol_fee)
             .ok_or(error!(DexError::InsufficientLiquidity))?;
     } else {
-        pool.protocol_fees_token_b = pool.protocol_fees_token_b
+        pool.protocol_fees_token_b = pool
+            .protocol_fees_token_b
             .checked_add(protocol_fee)
             .ok_or(error!(DexError::InsufficientLiquidity))?;
     }
@@ -377,15 +376,15 @@ pub fn collect_protocol_fees(ctx: Context<CollectProtocolFees>) -> Result<()> {
     let fee_collector_token_a = &ctx.accounts.fee_collector_token_a;
     let fee_collector_token_b = &ctx.accounts.fee_collector_token_b;
     let token_program = &ctx.accounts.token_program;
-    
+
     // Get accumulated protocol fees
     let token_a_fee_amount = pool.protocol_fees_token_a;
     let token_b_fee_amount = pool.protocol_fees_token_b;
-    
+
     // Reset protocol fee accumulators (do this before transfers to prevent reentrancy issues)
     pool.protocol_fees_token_a = 0;
     pool.protocol_fees_token_b = 0;
-    
+
     // Transfer token A fees if any
     if token_a_fee_amount > 0 {
         transfer_fee_tokens_to_collector(
@@ -397,7 +396,7 @@ pub fn collect_protocol_fees(ctx: Context<CollectProtocolFees>) -> Result<()> {
             token_a_fee_amount,
         )?;
     }
-    
+
     // Transfer token B fees if any
     if token_b_fee_amount > 0 {
         transfer_fee_tokens_to_collector(
@@ -409,14 +408,14 @@ pub fn collect_protocol_fees(ctx: Context<CollectProtocolFees>) -> Result<()> {
             token_b_fee_amount,
         )?;
     }
-    
+
     // Log collected fees
     msg!(
         "Collected protocol fees: {} token A, {} token B",
         token_a_fee_amount,
         token_b_fee_amount
     );
-    
+
     Ok(())
 }
 
@@ -542,7 +541,8 @@ pub struct DexState {
 }
 
 impl DexState {
-    pub const LEN: usize = 32 + 8 + 8 + 8 + 1 + 32; // admin + pools_count + fee_numerator + fee_denominator + protocol_fee_percentage + fee_collector
+    pub const LEN: usize = 32 + 8 + 8 + 8 + 1 + 32; // admin + pools_count + fee_numerator + fee_denominator + protocol_fee_percentage +
+                                                    // fee_collector
 }
 
 #[account]

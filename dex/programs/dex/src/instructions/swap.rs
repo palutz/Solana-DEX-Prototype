@@ -132,14 +132,14 @@ pub(crate) fn calculate_fee_breakdown(
         .ok_or(error!(DexError::InsufficientLiquidity))?
         .checked_div(fee_denominator as u128)
         .ok_or(error!(DexError::InsufficientLiquidity))? as u64;
-    
+
     // Calculate protocol fee portion
     let protocol_fee_amount = (total_fee_amount as u128)
         .checked_mul(protocol_fee_percentage as u128)
         .ok_or(error!(DexError::InsufficientLiquidity))?
         .checked_div(100u128)
         .ok_or(error!(DexError::InsufficientLiquidity))? as u64;
-    
+
     Ok((total_fee_amount, protocol_fee_amount))
 }
 
