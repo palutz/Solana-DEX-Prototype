@@ -21,19 +21,17 @@
 ### Week 3: Swap Functionality & Testing
 
 - [x] Implement swap function with constant product formula
-- [~] Add fee calculation and distribution
-
-### Week 4: (Frontend & Integration)
-
-- [ ] Integrate with basic UI
+- [x] Add fee calculation and distribution
 
 ### Test coverage
 
 - Dex initialization with incorrect Admin Key is failing
 - Dex initialization with correct Admin Key
 - Creating a liquidity pool
-- Depositing and withdrawing liquidity
+- Depositing liquidity
+- Withdrawing liquidity
 - Swapping tokens
+- Collecting protocol fees
 
 ## Installation
 

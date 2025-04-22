@@ -49,8 +49,16 @@ pub mod dex {
         ctx: Context<Initialize>,
         fee_numerator: u64,
         fee_denominator: u64,
+        protocol_fee_percentage: u8,
+        fee_collector: Pubkey,
     ) -> Result<()> {
-        instructions::initialize_dex(ctx, fee_numerator, fee_denominator)
+        instructions::initialize_dex(
+            ctx,
+            fee_numerator,
+            fee_denominator,
+            protocol_fee_percentage,
+            fee_collector,
+        )
     }
 
     /// Creates a new liquidity pool for a token pair
@@ -189,6 +197,42 @@ pub mod dex {
     pub fn swap(ctx: Context<Swap>, input_amount: u64, minimum_output_amount: u64) -> Result<()> {
         instructions::swap_tokens(ctx, input_amount, minimum_output_amount)
     }
+
+    /// Collects accumulated protocol fees and sends them to the designated collector
+    /// Only callable by admin
+    // ┌─────────┐     ┌───────┐     ┌───────────────┐      ┌────────────────┐
+    // │  Admin  │────►│ Start │────►│ Admin Signer? │──No─►│ Error:NotAdmin │
+    // └─────────┘     └───────┘     └───────┬───────┘      └────────────────┘
+    //                                       │
+    //                                      Yes
+    //                                       │
+    //                                       ▼
+    //                               ┌────────────────┐      ┌───────────────────────┐
+    //                               │  Get Protocol  │──No─►│ Error:NoFeesToCollect │
+    //                               │  Fee Amounts   │      └───────────────────────┘
+    //                               └───────┬────────┘
+    //                                       │
+    //                                       ▼
+    //                               ┌────────────────┐
+    //                               │  Reset Pool's  │
+    //                               │  Fee Counters  │
+    //                               └───────┬────────┘
+    //                                       │
+    //                                       ▼
+    //                          ┌───────────────────────────┐
+    //                          │ Transfer Token A Protocol │
+    //                          │    Fees to Collector      │
+    //                          └────────────┬──────────────┘
+    //                                       │
+    //                                       │
+    //                                       ▼
+    //                          ┌───────────────────────────┐
+    //                          │ Transfer Token B Protocol │
+    //                          │    Fees to Collector      │
+    //                          └───────────────────────────┘
+    pub fn collect_fees(ctx: Context<CollectProtocolFees>) -> Result<()> {
+        instructions::collect_protocol_fees(ctx)
+    }
 }
 
 /// Defines custom error codes for the DEX program.
@@ -206,4 +250,7 @@ pub enum DexError {
     // Triggered when slippage tolerance is exceeded during a swap
     #[msg("Slippage tolerance exceeded.")]
     SlippageExceeded,
+    // Triggered when there are no fees to collect
+    #[msg("No fees to collect.")]
+    NoFeesToCollect,
 }

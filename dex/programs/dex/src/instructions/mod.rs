@@ -21,10 +21,18 @@ pub fn initialize_dex(
     ctx: Context<Initialize>,
     fee_numerator: u64,
     fee_denominator: u64,
+    protocol_fee_percentage: u8,
+    fee_collector: Pubkey,
 ) -> Result<()> {
     // Check that fee values are valid (non-zero numerator and numerator < denominator)
     require!(
         fee_numerator != 0 && fee_numerator < fee_denominator,
+        DexError::InvalidFees
+    );
+
+    // Check that protocol fee percentage is valid (0-100)
+    require!(
+        protocol_fee_percentage <= 100,
         DexError::InvalidFees
     );
 
@@ -34,6 +42,8 @@ pub fn initialize_dex(
     dex_state.pools_count = 0;
     dex_state.fee_numerator = fee_numerator;
     dex_state.fee_denominator = fee_denominator;
+    dex_state.protocol_fee_percentage = protocol_fee_percentage;
+    dex_state.fee_collector = fee_collector;
 
     Ok(())
 }
@@ -62,6 +72,11 @@ pub fn create_liquidity_pool(ctx: Context<CreatePool>) -> Result<()> {
     // Copy fee settings from DEX state
     pool.fee_numerator = dex_state.fee_numerator;
     pool.fee_denominator = dex_state.fee_denominator;
+    pool.protocol_fee_percentage = dex_state.protocol_fee_percentage;
+    
+    // Initialize protocol fees
+    pool.protocol_fees_token_a = 0;
+    pool.protocol_fees_token_b = 0;
 
     // Increment the pools counter in DEX state
     dex_state.pools_count += 1;
@@ -258,7 +273,7 @@ pub fn swap_tokens(
     minimum_output_amount: u64,
 ) -> Result<()> {
     // Get references to all accounts
-    let pool = &ctx.accounts.pool;
+    let pool = &mut ctx.accounts.pool;
     let source_mint = &ctx.accounts.source_mint;
     let destination_mint = &ctx.accounts.destination_mint;
     let user_source_token = &ctx.accounts.user_source_token;
@@ -280,13 +295,38 @@ pub fn swap_tokens(
     let source_reserve = pool_source_token.amount;
     let destination_reserve = pool_destination_token.amount;
 
-    // Calculate output amount using constant product formula with fees
-    let output_amount = calculate_output_amount(
+    // Calculate fee breakdown (total fee and protocol portion)
+    let (total_fee, protocol_fee) = calculate_fee_breakdown(
         input_amount,
-        source_reserve,
-        destination_reserve,
         pool.fee_numerator,
         pool.fee_denominator,
+        pool.protocol_fee_percentage,
+    )?;
+
+    // Update accumulated protocol fees
+    if is_source_token_a {
+        pool.protocol_fees_token_a = pool.protocol_fees_token_a
+            .checked_add(protocol_fee)
+            .ok_or(error!(DexError::InsufficientLiquidity))?;
+    } else {
+        pool.protocol_fees_token_b = pool.protocol_fees_token_b
+            .checked_add(protocol_fee)
+            .ok_or(error!(DexError::InsufficientLiquidity))?;
+    }
+
+    // Calculate input amount after fee
+    let input_amount_with_fee = input_amount
+        .checked_sub(total_fee)
+        .ok_or(error!(DexError::InsufficientLiquidity))?;
+
+    // Calculate output amount using constant product formula
+    // Use existing function but pass 0/1 for fee params to avoid double-charging fees
+    let output_amount = calculate_output_amount(
+        input_amount_with_fee,
+        source_reserve,
+        destination_reserve,
+        0, // No additional fee should be charged
+        1,
     )?;
 
     // Check slippage tolerance
@@ -318,11 +358,65 @@ pub fn swap_tokens(
 
     // Log swap details
     msg!(
-        "Swapped {} tokens for {} tokens",
+        "Swapped {} tokens for {} tokens (protocol fee: {})",
         input_amount,
-        output_amount
+        output_amount,
+        protocol_fee
     );
 
+    Ok(())
+}
+
+/// Collects protocol fees from a pool and sends them to the fee collector account
+pub fn collect_protocol_fees(ctx: Context<CollectProtocolFees>) -> Result<()> {
+    let pool = &mut ctx.accounts.pool;
+    let token_a_mint = &ctx.accounts.token_a_mint;
+    let token_b_mint = &ctx.accounts.token_b_mint;
+    let pool_token_a = &ctx.accounts.pool_token_a;
+    let pool_token_b = &ctx.accounts.pool_token_b;
+    let fee_collector_token_a = &ctx.accounts.fee_collector_token_a;
+    let fee_collector_token_b = &ctx.accounts.fee_collector_token_b;
+    let token_program = &ctx.accounts.token_program;
+    
+    // Get accumulated protocol fees
+    let token_a_fee_amount = pool.protocol_fees_token_a;
+    let token_b_fee_amount = pool.protocol_fees_token_b;
+    
+    // Reset protocol fee accumulators (do this before transfers to prevent reentrancy issues)
+    pool.protocol_fees_token_a = 0;
+    pool.protocol_fees_token_b = 0;
+    
+    // Transfer token A fees if any
+    if token_a_fee_amount > 0 {
+        transfer_fee_tokens_to_collector(
+            token_a_mint,
+            token_program,
+            pool_token_a,
+            fee_collector_token_a,
+            pool,
+            token_a_fee_amount,
+        )?;
+    }
+    
+    // Transfer token B fees if any
+    if token_b_fee_amount > 0 {
+        transfer_fee_tokens_to_collector(
+            token_b_mint,
+            token_program,
+            pool_token_b,
+            fee_collector_token_b,
+            pool,
+            token_b_fee_amount,
+        )?;
+    }
+    
+    // Log collected fees
+    msg!(
+        "Collected protocol fees: {} token A, {} token B",
+        token_a_fee_amount,
+        token_b_fee_amount
+    );
+    
     Ok(())
 }
 
@@ -439,10 +533,16 @@ pub struct DexState {
     /// math, which is more deterministic.
     pub fee_numerator: u64,
     pub fee_denominator: u64,
+    /// Protocol fee as a percentage of the total fee
+    /// protocol_fee_percentage is a number between 0 and 100
+    /// If set to 30, it means 30% of fees go to protocol, 70% to LPs
+    pub protocol_fee_percentage: u8,
+    /// Account that collects protocol fees
+    pub fee_collector: Pubkey,
 }
 
 impl DexState {
-    pub const LEN: usize = 32 + 8 + 8 + 8; // admin + pools_count + fee_numerator + fee_denominator
+    pub const LEN: usize = 32 + 8 + 8 + 8 + 1 + 32; // admin + pools_count + fee_numerator + fee_denominator + protocol_fee_percentage + fee_collector
 }
 
 #[account]
@@ -465,11 +565,17 @@ pub struct LiquidityPool {
     pub fee_numerator: u64,
     // Fee denominator (e.g. 1000 for a 1% fee)
     pub fee_denominator: u64,
+    // Protocol fee percentage (0-100)
+    pub protocol_fee_percentage: u8,
+    // Accumulated fees for token A (for protocol)
+    pub protocol_fees_token_a: u64,
+    // Accumulated fees for token B (for protocol)
+    pub protocol_fees_token_b: u64,
 }
 
 impl LiquidityPool {
-    pub const LEN: usize = 32 + 32 + 32 + 32 + 32 + 1 + 8 + 8 + 8; // token_a_mint + token_b_mint + token_a_account + token_b_account + lp_token_mint + bump +
-                                                                   // total_liquidity + fees
+    pub const LEN: usize = 32 + 32 + 32 + 32 + 32 + 1 + 8 + 8 + 8 + 1 + 8 + 8; // token_a_mint + token_b_mint + token_a_account + token_b_account + lp_token_mint + bump +
+                                                                               // total_liquidity + fees + protocol_fee_percentage + protocol_fees
 }
 
 #[derive(Accounts)]
@@ -673,4 +779,64 @@ pub struct Swap<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
+}
+
+/// Defines the accounts required for collecting protocol fees
+#[derive(Accounts)]
+pub struct CollectProtocolFees<'info> {
+    // Only the admin can collect fees
+    #[account(
+        mut,
+        constraint = admin.key() == dex_state.admin @ DexError::NotAdmin
+    )]
+    pub admin: Signer<'info>,
+
+    // DEX state to verify admin and fee collector
+    #[account(mut)]
+    pub dex_state: Account<'info, DexState>,
+
+    // The pool to collect fees from
+    #[account(mut)]
+    pub pool: Account<'info, LiquidityPool>,
+
+    // Token A mint info
+    pub token_a_mint: InterfaceAccount<'info, Mint>,
+
+    // Token B mint info
+    pub token_b_mint: InterfaceAccount<'info, Mint>,
+
+    // Pool's token A account holding reserves
+    #[account(
+        mut,
+        constraint = pool_token_a.key() == pool.token_a_account,
+        constraint = token_a_mint.key() == pool.token_a_mint
+    )]
+    pub pool_token_a: InterfaceAccount<'info, TokenAccount>,
+
+    // Pool's token B account holding reserves
+    #[account(
+        mut,
+        constraint = pool_token_b.key() == pool.token_b_account,
+        constraint = token_b_mint.key() == pool.token_b_mint
+    )]
+    pub pool_token_b: InterfaceAccount<'info, TokenAccount>,
+
+    // Fee collector's token A account
+    #[account(
+        mut,
+        constraint = fee_collector_token_a.owner == dex_state.fee_collector,
+        constraint = fee_collector_token_a.mint == pool.token_a_mint
+    )]
+    pub fee_collector_token_a: InterfaceAccount<'info, TokenAccount>,
+
+    // Fee collector's token B account
+    #[account(
+        mut, 
+        constraint = fee_collector_token_b.owner == dex_state.fee_collector,
+        constraint = fee_collector_token_b.mint == pool.token_b_mint
+    )]
+    pub fee_collector_token_b: InterfaceAccount<'info, TokenAccount>,
+
+    // Required for token operations
+    pub token_program: Interface<'info, TokenInterface>,
 }
