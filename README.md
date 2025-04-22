@@ -1,37 +1,44 @@
-# DEX Project Setup Guide
+# Solana DEX Prototype
 
-## NOTE: Roadmap
+A decentralized exchange protocol built on Solana blockchain.
 
-### Week 1: Environment Setup & Core Program Structure
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-- [x] Set up Solana development environment
-- [x] Create program skeleton with state and instruction definitions
-- [x] Implement initialization logic
-- [x] Implement basic user token account management
-- [x] Create test framework
+## Overview
 
-### Week 2: Deposit, Withdrawal & Pool Management
+This project implements a prototype decentralized exchange on Solana with core AMM functionality, including:
 
-- [x] Implement deposit/withdrawal functions
-- [x] Implement pool initialization logic
-- [x] Develop liquidity provision/withdrawal functions
-- [x] Write tests for these functions
-- [x] Start building simple client integration
+- Constant product market maker (x*y=k) implementation
+- Liquidity pool creation and management
+- Token swapping with slippage protection
+- Liquidity provider (LP) token issuance and redemption
+- Fee collection mechanism with protocol fee allocation
 
-### Week 3: Swap Functionality & Testing
+## Features
 
-- [x] Implement swap function with constant product formula
-- [x] Add fee calculation and distribution
+- **Pool Creation**: Create trading pairs for any token combination
+- **Liquidity Provision**: Add liquidity and receive LP tokens representing pool share
+- **Token Swapping**: Exchange tokens with automatic price discovery
+- **Liquidity Withdrawal**: Redeem LP tokens for underlying assets
+- **Fee Structure**: Configurable trading fees with protocol revenue sharing
 
-### Test coverage
+## Technical Architecture
 
-- Dex initialization with incorrect Admin Key is failing
-- Dex initialization with correct Admin Key
-- Creating a liquidity pool
-- Depositing liquidity
-- Withdrawing liquidity
-- Swapping tokens
-- Collecting protocol fees
+The protocol is built using Anchor framework and consists of the following components:
+
+- **State Management**: Global DEX configuration and pool tracking
+- **Liquidity Pool Logic**: Deposit/withdrawal functions and LP token issuance
+- **Swap Engine**: Trading logic with constant product formula
+- **Fee System**: Collection and distribution of protocol fees
+
+## Getting Started
+
+### Prerequisites
+
+- Solana CLI
+- Anchor Framework
+- Rust
+- Node.js and Yarn
 
 ## Installation
 
@@ -66,75 +73,36 @@
    ```bash
    anchor test
    ```
-   This executes all test cases from `DEX-group-5/dex/tests/dex.ts`
+   This executes all test cases from `dex/tests/dex.ts`
 
-## Debugging Tips
+## Development Status
 
-### Viewing Program Logs
+This project is a prototype and is not intended for production use. It demonstrates core DEX functionality but requires additional security audits and optimization before mainnet deployment.
 
-Use the `msg!` macro (Anchor-specific) to log information from your program:
+### User Interface
 
-1. Start a local Solana test validator in one terminal:
-   ```bash
-   solana-test-validator -r
-   ```
+A basic UI (purple-ui directory) is included in this repository, but it's currently under development and not yet complete. The interface will eventually allow for:
 
-2. View filtered logs in another terminal:
-   ```bash
-   solana logs -ul | grep -i <search_term>
-   ```
-   - `-ul` specifies the local cluster (use `-um` for mainnet, `-ud` for devnet)
+- Connecting wallet and viewing balances
+- Creating and managing liquidity pools
+- Adding and removing liquidity
+- Performing token swaps
+- Viewing transaction history
 
-3. Run tests using the local validator:
-   ```bash
-   anchor test --skip-local-validator
-   ```
+## Implementation Details
 
-### Managing Account Balance
+The DEX implements:
 
-Each account must be rent-exempt (have minimum SOL balance). To fund accounts on your local cluster:
+- **Initialization**: Admin-controlled setup with configurable fee structure
+- **Pool Creation**: Permissionless creation of liquidity pools
+- **Liquidity Management**: Deposit and withdrawal functions with fair LP token distribution
+- **Swap Algorithm**: Constant product formula with fee calculation
+- **Protocol Fees**: Mechanism for sustainable protocol economics
 
-```bash
-solana airdrop 100 <wallet_address> -ul
-```
+## License
 
-# Frontend Deployment
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
-- A Vercel account
+---
 
-### Local Development
-```bash
-# Navigate to the UI directory
-cd purple-ui
-
-# Install dependencies
-npm install
-
-# Start the development server
-npm run dev
-```
-
-### Deploy to Vercel
-```bash
-# Install Vercel CLI globally
-npm install -g vercel
-
-# Navigate to the UI directory
-cd purple-ui
-
-# Deploy to Vercel
-vercel
-
-# Deploy to production
-vercel --prod
-```
-
-<!-- ### Environment Variables
-Make sure to set these environment variables in your Vercel project:
-
-- `VITE_SOLANA_RPC_URL`: Your Solana RPC endpoint
-- `VITE_PROGRAM_ID`: The deployed program ID for the DEX
-- `VITE_SOLANA_NETWORK`: The Solana network to use (mainnet-beta, devnet, etc.) -->
+This is a development prototype. Not for production use.
