@@ -4,7 +4,7 @@
 use solana_security_txt::security_txt;
 #[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
-    name: "GR5-Dex",
+    name: "Solana-DEX-prototype",
     project_url: "http://example.com",
     contacts: "email:nickshv13@icloud.com",
     policy: "https://github.com/anza-xyz/agave/blob/master/SECURITY.mdhttps://github.com/anza-xyz/agave/blob/master/SECURITY.md"
