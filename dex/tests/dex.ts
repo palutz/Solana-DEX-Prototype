@@ -687,7 +687,128 @@ describe("DEX tests", () => {
     expect(reverseActualOutput).to.be.at.least(reverseMinimumOutput);
   });
 
-  // NOTE: Fee calculation and distribution
+  // NOTE: Collecting protocol fees
+  it("Collecting protocol fees", async () => {
+    // Create fee collector token accounts
+    feeCollectorTokenA = getAssociatedTokenAddressSync(
+      tokenAMint,
+      feeCollector.publicKey,
+      false,
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_PROGRAM_ID
+    );
+
+    feeCollectorTokenB = getAssociatedTokenAddressSync(
+      tokenBMint,
+      feeCollector.publicKey,
+      false,
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_PROGRAM_ID
+    );
+
+    // Create fee collector token accounts if they don't exist
+    const setupFeeCollectorTx = new Transaction();
+
+    setupFeeCollectorTx.add(
+      createAssociatedTokenAccountInstruction(
+        adminWallet.publicKey,
+        feeCollectorTokenA,
+        feeCollector.publicKey,
+        tokenAMint,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_PROGRAM_ID
+      ),
+      createAssociatedTokenAccountInstruction(
+        adminWallet.publicKey,
+        feeCollectorTokenB,
+        feeCollector.publicKey,
+        tokenBMint,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_PROGRAM_ID
+      )
+    );
+
+    await provider.sendAndConfirm(setupFeeCollectorTx, [admin]);
+
+    // Get current protocol fees
+    const poolBeforeCollection = await program.account.liquidityPool.fetch(poolPda);
+    const protocolFeesTokenABefore = poolBeforeCollection.protocolFeesTokenA.toNumber();
+    const protocolFeesTokenBBefore = poolBeforeCollection.protocolFeesTokenB.toNumber();
+
+    // Get fee collector balances before collection
+    const feeCollectorTokenABalanceBefore = await provider.connection.getTokenAccountBalance(feeCollectorTokenA);
+    const feeCollectorTokenBBalanceBefore = await provider.connection.getTokenAccountBalance(feeCollectorTokenB);
+
+    // Ensure we have fees to collect
+    expect(protocolFeesTokenABefore + protocolFeesTokenBBefore).to.be.greaterThan(0);
+
+    // Collect fees
+    const collectFeesAccounts = {
+      admin: adminWallet.publicKey,
+      dexState: dexStatePda,
+      pool: poolPda,
+      tokenAMint,
+      tokenBMint,
+      poolTokenA,
+      poolTokenB,
+      feeCollectorTokenA,
+      feeCollectorTokenB,
+      tokenProgram: TOKEN_2022_PROGRAM_ID,
+    };
+
+    await program.methods
+      .collectFees()
+      .accounts(collectFeesAccounts)
+      .rpc();
+
+    // Get pool and balances after collection
+    const poolAfterCollection = await program.account.liquidityPool.fetch(poolPda);
+    const feeCollectorTokenABalanceAfter = await provider.connection.getTokenAccountBalance(feeCollectorTokenA);
+    const feeCollectorTokenBBalanceAfter = await provider.connection.getTokenAccountBalance(feeCollectorTokenB);
+
+    // Verify that protocol fees were transferred to fee collector
+    expect(poolAfterCollection.protocolFeesTokenA.toNumber()).to.equal(0);
+    expect(poolAfterCollection.protocolFeesTokenB.toNumber()).to.equal(0);
+
+    // Verify fee collector received the fees
+    const tokenAFeeCollected = Number(feeCollectorTokenABalanceAfter.value.amount) -
+      Number(feeCollectorTokenABalanceBefore.value.amount || 0);
+    const tokenBFeeCollected = Number(feeCollectorTokenBBalanceAfter.value.amount) -
+      Number(feeCollectorTokenBBalanceBefore.value.amount || 0);
+
+    expect(tokenAFeeCollected).to.equal(protocolFeesTokenABefore);
+    expect(tokenBFeeCollected).to.equal(protocolFeesTokenBBefore);
+  });
+
+  // NOTE: Unauthorized fee collection attempt
+  it("Unauthorized fee collection fails", async () => {
+    // Try to collect fees with unauthorized user
+    const collectFeesAccounts = {
+      admin: unauthorizedAttacker.publicKey,
+      dexState: dexStatePda,
+      pool: poolPda,
+      tokenAMint,
+      tokenBMint,
+      poolTokenA,
+      poolTokenB,
+      feeCollectorTokenA,
+      feeCollectorTokenB,
+      tokenProgram: TOKEN_2022_PROGRAM_ID,
+    };
+
+    try {
+      await program.methods
+        .collectFees()
+        .accounts(collectFeesAccounts)
+        .signers([unauthorizedAttacker])
+        .rpc();
+
+      throw new Error("Expected transaction to fail, but it succeeded");
+    } catch (err: any) {
+      expect(err.error.errorCode.code).to.equal("NotAdmin");
+    }
+  });
+
   it("Fee calculation and distribution", async () => {
     // Get token accounts
     const ownerTokenA = getAssociatedTokenAddressSync(
@@ -705,7 +826,6 @@ describe("DEX tests", () => {
       TOKEN_2022_PROGRAM_ID,
       ASSOCIATED_PROGRAM_ID
     );
-
     // Get pool data before swap
     const poolBeforeSwap = await program.account.liquidityPool.fetch(poolPda);
     const poolTokenABalanceBefore = await provider.connection.getTokenAccountBalance(poolTokenA);
@@ -1388,7 +1508,6 @@ describe("DEX tests", () => {
     // Verify LP amount is close to expected (within 1% margin due to rounding)
     expect(imbalancedLpAmount).to.be.approximately(expectedImbalancedLpAmount, expectedImbalancedLpAmount * 0.01);
   });
-
 });
 
 /**
