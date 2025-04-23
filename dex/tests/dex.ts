@@ -19,7 +19,7 @@ import {
 // Initialize the Anchor provider
 const provider = anchor.AnchorProvider.env();
 anchor.setProvider(provider);
-const program = anchor.workspace.Dex as any; // TODO: fix this
+const program = anchor.workspace.Dex as Program<Dex>;
 const DEFAULT_AIRDROP_SOL = 2;
 
 describe("DEX tests", () => {
